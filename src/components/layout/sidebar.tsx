@@ -21,7 +21,7 @@ const navItems = [
   { label: "Google My Business", href: "/gmb", icon: MapPin },
   { label: "Social Media", href: "/social-media", icon: Share2 },
   { label: "RingCentral", href: "/ringcentral", icon: Phone },
-  { label: "Go High Level", href: "/go-high-level", icon: Mail },
+  { label: "Email Marketing", href: "/go-high-level", icon: Mail },
   { label: "Budget", href: "/budget", icon: Wallet },
 ];
 

@@ -1,0 +1,34 @@
+import type { DashboardConfig } from "@/types/widget";
+
+export const defaultDashboard: DashboardConfig = {
+  widgets: [
+    { id: "w1", type: "stat", title: "Total Sessions", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true },
+    { id: "w2", type: "stat", title: "Ad Spend", dataSource: "google-ads", metric: "spend", format: "currency", comparisonEnabled: true },
+    { id: "w3", type: "stat", title: "Total Leads", dataSource: "meta-ads", metric: "conversions", format: "number", comparisonEnabled: true },
+    { id: "w4", type: "stat", title: "Phone Calls", dataSource: "callrail", metric: "totalCalls", format: "number", comparisonEnabled: true },
+    { id: "w5", type: "line-chart", title: "Website Traffic", dataSource: "google-analytics", metric: "sessions", format: "number" },
+    { id: "w6", type: "bar-chart", title: "Google Ads Clicks", dataSource: "google-ads", metric: "clicks", format: "number" },
+    { id: "w7", type: "area-chart", title: "Meta Ads Reach", dataSource: "meta-ads", metric: "reach", format: "number" },
+    { id: "w8", type: "pie-chart", title: "Call Sources", dataSource: "callrail", metric: "totalCalls", format: "number" },
+    { id: "w9", type: "stat", title: "Email Open Rate", dataSource: "email-marketing", metric: "openRate", format: "percent", comparisonEnabled: true },
+    { id: "w10", type: "stat", title: "IG Followers", dataSource: "instagram", metric: "followers", format: "number", comparisonEnabled: true },
+    { id: "w11", type: "goal-tracker", title: "Monthly Ad Budget", dataSource: "google-ads", metric: "spend", format: "currency", goalValue: 10000 },
+    { id: "w12", type: "stat", title: "YouTube Views", dataSource: "youtube", metric: "views", format: "number", comparisonEnabled: true },
+  ],
+  layouts: {
+    lg: [
+      { i: "w1", x: 0, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
+      { i: "w2", x: 3, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
+      { i: "w3", x: 6, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
+      { i: "w4", x: 9, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
+      { i: "w5", x: 0, y: 2, w: 6, h: 4, minW: 3, minH: 3 },
+      { i: "w6", x: 6, y: 2, w: 6, h: 4, minW: 3, minH: 3 },
+      { i: "w7", x: 0, y: 6, w: 6, h: 4, minW: 3, minH: 3 },
+      { i: "w8", x: 6, y: 6, w: 4, h: 4, minW: 3, minH: 3 },
+      { i: "w9", x: 10, y: 6, w: 2, h: 2, minW: 2, minH: 2 },
+      { i: "w10", x: 10, y: 8, w: 2, h: 2, minW: 2, minH: 2 },
+      { i: "w11", x: 0, y: 10, w: 4, h: 2, minW: 2, minH: 2 },
+      { i: "w12", x: 4, y: 10, w: 3, h: 2, minW: 2, minH: 2 },
+    ],
+  },
+};
