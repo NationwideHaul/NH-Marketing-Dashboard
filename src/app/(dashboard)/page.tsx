@@ -10,9 +10,8 @@ export default function OverviewPage() {
     "Lead generation is trending upward with 63 total leads this period (+5.0%). Meta Ads continues to be the strongest channel with a $0.22 average CPC — one of the lowest in the trucking industry.\n\nPhone calls are up to 146 (+5.0%), indicating strong buyer intent from current campaigns. Google Ads spend is at $9,407 (94% of monthly budget) — consider increasing budget allocation for top-performing campaigns.\n\nKey opportunities: Scale the VOLVO Sleepers campaign on Meta (highest CTR at 3.64%), optimize Google Ads keywords with declining CTR, and continue YouTube content strategy which is driving 32.9K views organically."
   );
 
-  return (
-    <div>
-      {/* AI Summary */}
+  const header = (
+    <>
       <div className="mb-4 rounded-lg border border-primary/20 bg-primary/5 p-4">
         <div className="flex items-center gap-2 mb-2">
           <Sparkles className="h-4 w-4 text-primary" />
@@ -35,7 +34,6 @@ export default function OverviewPage() {
         )}
       </div>
 
-      {/* Top 3 Trailers Requested */}
       <div className="mb-4 rounded-lg border border-border bg-card p-4">
         <div className="flex items-center gap-2 mb-3">
           <Truck className="h-4 w-4 text-muted-foreground" />
@@ -55,11 +53,10 @@ export default function OverviewPage() {
             <p className="text-xs text-muted-foreground">18 requests</p>
           </div>
         </div>
-        <p className="text-[10px] text-muted-foreground mt-2">Based on call transcripts, form submissions, and CRM tags. Connect live data to update automatically.</p>
+        <p className="text-[10px] text-muted-foreground mt-2">Based on call transcripts, form submissions, and CRM tags.</p>
       </div>
-
-      {/* Widgets Grid */}
-      <WidgetPage />
-    </div>
+    </>
   );
+
+  return <WidgetPage headerContent={header} />;
 }

@@ -1,15 +1,15 @@
-import type { WidgetConfig, LayoutItem, DashboardConfig } from "@/types/widget";
+import type { DashboardConfig } from "@/types/widget";
 
-const STORAGE_KEY = "nh-dashboard-config-v2"; // v2: added callrail mock data + multi-breakpoint layouts
+const PREFIX = "nh-dash-v3-";
 
-export function saveDashboard(config: DashboardConfig): void {
+export function saveDashboard(pageKey: string, config: DashboardConfig): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  localStorage.setItem(PREFIX + pageKey, JSON.stringify(config));
 }
 
-export function loadDashboard(): DashboardConfig | null {
+export function loadDashboard(pageKey: string): DashboardConfig | null {
   if (typeof window === "undefined") return null;
-  const data = localStorage.getItem(STORAGE_KEY);
+  const data = localStorage.getItem(PREFIX + pageKey);
   if (!data) return null;
   try {
     return JSON.parse(data);
@@ -18,7 +18,13 @@ export function loadDashboard(): DashboardConfig | null {
   }
 }
 
-export function clearDashboard(): void {
+export function clearDashboard(pageKey: string): void {
   if (typeof window === "undefined") return;
-  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(PREFIX + pageKey);
+}
+
+export function clearAllDashboards(): void {
+  if (typeof window === "undefined") return;
+  const keys = Object.keys(localStorage).filter((k) => k.startsWith(PREFIX));
+  keys.forEach((k) => localStorage.removeItem(k));
 }

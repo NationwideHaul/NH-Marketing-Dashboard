@@ -12,12 +12,12 @@ import "react-resizable/css/styles.css";
 const Grid = ResponsiveGridLayout as any;
 
 interface WidgetPageProps {
-  filter?: string; // Optional: filter widgets by dataSource
   title?: string;
   description?: string;
+  headerContent?: React.ReactNode;
 }
 
-export function WidgetPage({ filter, title, description }: WidgetPageProps) {
+export function WidgetPage({ title, description, headerContent }: WidgetPageProps) {
   const { widgets, layouts, editMode, showPicker, updateLayouts } = useDashboard();
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1200);
@@ -41,43 +41,32 @@ export function WidgetPage({ filter, title, description }: WidgetPageProps) {
     [updateLayouts]
   );
 
-  // Filter widgets if a filter is specified
-  const filteredWidgets = filter
-    ? widgets.filter((w) => w.dataSource === filter || w.dataSource === "overview")
-    : widgets;
-
-  // Filter layouts to match filtered widgets
-  const filteredIds = new Set(filteredWidgets.map((w) => w.id));
-  const filteredLayouts: Record<string, any[]> = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
-  Object.entries(layouts).forEach(([bp, items]) => {
-    filteredLayouts[bp] = (items as any[]).filter((item: any) => filteredIds.has(item.i)); // eslint-disable-line @typescript-eslint/no-explicit-any
-  });
-
   return (
     <div ref={containerRef}>
-      {title && (
+      {(title || headerContent) && (
         <div className="mb-4">
-          <h2 className="text-lg font-bold text-foreground">{title}</h2>
+          {title && <h2 className="text-lg font-bold text-foreground">{title}</h2>}
           {description && <p className="text-sm text-muted-foreground">{description}</p>}
+          {headerContent}
         </div>
       )}
 
       <Grid
         className="layout"
         width={width}
-        layouts={filter ? filteredLayouts : layouts}
-        onLayoutChange={filter ? undefined : handleLayoutChange}
+        layouts={layouts}
+        onLayoutChange={handleLayoutChange}
         breakpoints={{ lg: 900, md: 600, sm: 400, xs: 0 }}
         cols={{ lg: 12, md: 8, sm: 4, xs: 2 }}
         rowHeight={50}
-        isDraggable={editMode && !filter}
-        isResizable={editMode && !filter}
+        isDraggable={editMode}
+        isResizable={editMode}
         draggableHandle=".drag-handle"
         containerPadding={[0, 0]}
         margin={[12, 12]}
         useCSSTransforms
       >
-        {filteredWidgets.map((widget) => (
+        {widgets.map((widget) => (
           <div key={widget.id} className={editMode ? "ring-2 ring-primary/30 rounded-lg" : ""}>
             <WidgetWrapper config={widget} />
           </div>

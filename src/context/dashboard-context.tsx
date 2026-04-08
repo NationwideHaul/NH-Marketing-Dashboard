@@ -1,16 +1,19 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import type { WidgetConfig, LayoutItem, DashboardConfig } from "@/types/widget";
 import { saveDashboard, loadDashboard, clearDashboard } from "@/lib/dashboard-storage";
 import { defaultWidgetSizes, getNextPosition } from "@/lib/widget-registry";
-import { defaultDashboard } from "@/lib/default-dashboard";
+import { pageDefaults } from "@/lib/page-defaults";
+import { overviewDefaults } from "@/lib/page-defaults";
 
 interface DashboardContextType {
   widgets: WidgetConfig[];
   layouts: Record<string, LayoutItem[]>;
   editMode: boolean;
   showPicker: boolean;
+  pageKey: string;
   addWidget: (widget: WidgetConfig) => void;
   removeWidget: (id: string) => void;
   updateWidget: (widget: WidgetConfig) => void;
@@ -23,31 +26,38 @@ interface DashboardContextType {
 const DashboardContext = createContext<DashboardContextType | null>(null);
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const pageKey = pathname || "/";
+
   const [widgets, setWidgets] = useState<WidgetConfig[]>([]);
   const [layouts, setLayouts] = useState<Record<string, LayoutItem[]>>({});
   const [editMode, setEditMode] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [loadedPage, setLoadedPage] = useState<string>("");
 
-  // Load from localStorage on mount
+  // Load per-page config when page changes
   useEffect(() => {
-    const saved = loadDashboard();
+    const saved = loadDashboard(pageKey);
     if (saved && saved.widgets.length > 0) {
       setWidgets(saved.widgets);
       setLayouts(saved.layouts);
     } else {
-      // Use default dashboard
-      setWidgets(defaultDashboard.widgets);
-      setLayouts(defaultDashboard.layouts);
+      // Use page defaults or generic overview
+      const defaults = pageDefaults[pageKey] || overviewDefaults;
+      setWidgets(defaults.widgets);
+      setLayouts(defaults.layouts);
     }
-    setLoaded(true);
-  }, []);
+    setLoadedPage(pageKey);
+    setEditMode(false);
+    setShowPicker(false);
+  }, [pageKey]);
 
   // Persist to localStorage on change
   useEffect(() => {
-    if (!loaded) return;
-    saveDashboard({ widgets, layouts });
-  }, [widgets, layouts, loaded]);
+    if (loadedPage !== pageKey) return; // Don't save during page transition
+    if (widgets.length === 0) return;
+    saveDashboard(pageKey, { widgets, layouts });
+  }, [widgets, layouts, pageKey, loadedPage]);
 
   const addWidget = useCallback((widget: WidgetConfig) => {
     setWidgets((prev) => [...prev, widget]);
@@ -75,7 +85,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setLayouts((prev) => {
       const newLayouts: Record<string, LayoutItem[]> = {};
       Object.entries(prev).forEach(([bp, items]) => {
-        newLayouts[bp] = items.filter((item) => item.i !== id);
+        newLayouts[bp] = (items as LayoutItem[]).filter((item) => item.i !== id);
       });
       return newLayouts;
     });
@@ -95,27 +105,20 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   }, [editMode]);
 
   const resetDashboard = useCallback(() => {
-    clearDashboard();
-    setWidgets(defaultDashboard.widgets);
-    setLayouts(defaultDashboard.layouts);
-  }, []);
+    clearDashboard(pageKey);
+    const defaults = pageDefaults[pageKey] || overviewDefaults;
+    setWidgets(defaults.widgets);
+    setLayouts(defaults.layouts);
+  }, [pageKey]);
 
-  if (!loaded) return null; // Prevent hydration mismatch
+  if (loadedPage !== pageKey) return null; // Prevent flash during page transition
 
   return (
     <DashboardContext.Provider
       value={{
-        widgets,
-        layouts,
-        editMode,
-        showPicker,
-        addWidget,
-        removeWidget,
-        updateWidget,
-        updateLayouts,
-        toggleEditMode,
-        setShowPicker,
-        resetDashboard,
+        widgets, layouts, editMode, showPicker, pageKey,
+        addWidget, removeWidget, updateWidget, updateLayouts,
+        toggleEditMode, setShowPicker, resetDashboard,
       }}
     >
       {children}
