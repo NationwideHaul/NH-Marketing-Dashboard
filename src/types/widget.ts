@@ -53,6 +53,7 @@ export interface MetricOption {
   key: string;
   label: string;
   format: "number" | "currency" | "percent";
+  category?: string;
 }
 
 export interface DataSourceOption {

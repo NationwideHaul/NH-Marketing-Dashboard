@@ -1,42 +1,67 @@
 "use client";
 
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ResponsiveContainer, AreaChart, Area } from "recharts";
 import { cn, formatNumber, formatCurrency, formatPercent } from "@/lib/utils";
-import { useWidgetMetric } from "@/hooks/use-widget-data";
+import { useWidgetMetric, useWidgetTimeSeries } from "@/hooks/use-widget-data";
+import { getDataSource } from "@/lib/widget-registry";
+import { aggregateWeekly } from "@/lib/mock-data/generator";
 import type { WidgetConfig } from "@/types/widget";
 
 export function StatWidget({ config }: { config: WidgetConfig }) {
   const metric = useWidgetMetric(config);
+  const timeSeries = useWidgetTimeSeries(config);
+  const ds = getDataSource(config.dataSource);
 
-  if (!metric) {
-    return <div className="flex items-center justify-center h-full text-sm text-muted-foreground">No data</div>;
-  }
+  // Aggregate for sparkline
+  const sparkData = aggregateWeekly(timeSeries).map((p) => ({ v: p.value }));
 
+  const value = metric?.value ?? 0;
   const formattedValue =
-    config.format === "currency" ? formatCurrency(metric.value)
-    : config.format === "percent" ? formatPercent(metric.value)
-    : formatNumber(metric.value);
+    config.format === "currency" ? formatCurrency(value)
+    : config.format === "percent" ? formatPercent(value)
+    : formatNumber(value);
 
-  const TrendIcon = metric.trend === "up" ? TrendingUp : metric.trend === "down" ? TrendingDown : Minus;
+  const trend = metric?.trend || "flat";
+  const change = metric?.changePercent || 0;
+  const TrendIcon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
 
   return (
-    <div className="flex flex-col justify-center h-full px-4">
-      <p className="text-2xl font-bold text-card-foreground">{formattedValue}</p>
-      {config.comparisonEnabled && metric.changePercent !== undefined && (
-        <div className="flex items-center gap-1 mt-1">
-          <TrendIcon className={cn("h-3.5 w-3.5",
-            metric.trend === "up" && "text-green-600",
-            metric.trend === "down" && "text-red-500",
-            metric.trend === "flat" && "text-muted-foreground"
+    <div className="relative flex flex-col justify-between h-full px-4 py-3 overflow-hidden">
+      {/* Sparkline background */}
+      {sparkData.length > 2 && (
+        <div className="absolute inset-0 top-[40%] opacity-[0.08]">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={sparkData}>
+              <Area type="monotone" dataKey="v" stroke="#BE1E23" fill="#BE1E23" fillOpacity={1} strokeWidth={1.5} dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Content */}
+      <div className="relative z-10">
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className="text-xs">{ds?.icon}</span>
+          <span className="text-[10px] text-gray-400 truncate">{config.title}</span>
+        </div>
+        <p className="text-2xl font-bold text-gray-900">{formattedValue}</p>
+      </div>
+
+      {config.comparisonEnabled && change !== 0 && (
+        <div className="relative z-10 flex items-center gap-1">
+          <TrendIcon className={cn("h-3 w-3",
+            trend === "up" && "text-green-600",
+            trend === "down" && "text-red-500",
+            trend === "flat" && "text-gray-400"
           )} />
-          <span className={cn("text-xs font-medium",
-            metric.trend === "up" && "text-green-600",
-            metric.trend === "down" && "text-red-500",
-            metric.trend === "flat" && "text-muted-foreground"
+          <span className={cn("text-[11px] font-medium",
+            trend === "up" && "text-green-600",
+            trend === "down" && "text-red-500",
+            trend === "flat" && "text-gray-400"
           )}>
-            {metric.changePercent > 0 ? "+" : ""}{metric.changePercent.toFixed(1)}%
+            {change > 0 ? "+" : ""}{change.toFixed(1)}% vs prev
           </span>
-          <span className="text-xs text-muted-foreground">vs prev</span>
         </div>
       )}
     </div>
