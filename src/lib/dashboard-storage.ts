@@ -1,6 +1,6 @@
 import type { WidgetConfig, LayoutItem, DashboardConfig } from "@/types/widget";
 
-const STORAGE_KEY = "nh-dashboard-config";
+const STORAGE_KEY = "nh-dashboard-config-v2"; // v2: added callrail mock data + multi-breakpoint layouts
 
 export function saveDashboard(config: DashboardConfig): void {
   if (typeof window === "undefined") return;

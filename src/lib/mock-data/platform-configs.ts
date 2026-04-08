@@ -82,4 +82,18 @@ export const platformMetricConfigs: Record<string, MetricConfig[]> = {
     { key: "adSpend", label: "Ad Spend", baseline: 135, dailyGrowth: 0.0005, noise: 0.1, weekendDip: 0.15, format: "currency" },
     { key: "leads", label: "Leads", baseline: 1.3, dailyGrowth: 0.001, noise: 0.45, weekendDip: 0.4, format: "number", min: 0 },
   ],
+  callrail: [
+    { key: "totalCalls", label: "Total Calls", baseline: 5.2, dailyGrowth: 0.001, noise: 0.3, weekendDip: 0.7, format: "number", min: 0 },
+    { key: "answered", label: "Answered", baseline: 4.4, dailyGrowth: 0.001, noise: 0.28, weekendDip: 0.7, format: "number", min: 0 },
+    { key: "missed", label: "Missed Calls", baseline: 0.8, dailyGrowth: -0.001, noise: 0.5, weekendDip: 0.7, format: "number", min: 0 },
+    { key: "avgDuration", label: "Avg. Duration (min)", baseline: 4.2, dailyGrowth: 0.0003, noise: 0.15, weekendDip: 0, format: "number", min: 1 },
+    { key: "uniqueCallers", label: "Unique Callers", baseline: 3.3, dailyGrowth: 0.001, noise: 0.3, weekendDip: 0.65, format: "number", min: 0 },
+    { key: "answerRate", label: "Answer Rate", baseline: 84.6, dailyGrowth: 0.0002, noise: 0.05, weekendDip: 0, format: "percent", min: 50, max: 100 },
+  ],
+  overview: [
+    { key: "totalLeads", label: "Total Leads", baseline: 8.5, dailyGrowth: 0.001, noise: 0.3, weekendDip: 0.4, format: "number", min: 0 },
+    { key: "totalSpend", label: "Total Spend", baseline: 650, dailyGrowth: 0.0004, noise: 0.1, weekendDip: 0.1, format: "currency" },
+    { key: "totalClicks", label: "Total Clicks", baseline: 450, dailyGrowth: 0.0008, noise: 0.15, weekendDip: 0.2, format: "number" },
+    { key: "totalImpressions", label: "Total Impressions", baseline: 18000, dailyGrowth: 0.001, noise: 0.12, weekendDip: 0.15, format: "number" },
+  ],
 };

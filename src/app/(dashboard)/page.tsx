@@ -43,7 +43,7 @@ export default function DashboardPage() {
         width={width}
         layouts={layouts}
         onLayoutChange={handleLayoutChange}
-        breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480 }}
+        breakpoints={{ lg: 900, md: 600, sm: 400, xs: 0 }}
         cols={{ lg: 12, md: 8, sm: 4, xs: 2 }}
         rowHeight={50}
         isDraggable={editMode}
