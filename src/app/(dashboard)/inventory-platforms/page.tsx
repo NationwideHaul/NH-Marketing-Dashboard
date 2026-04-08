@@ -5,102 +5,27 @@ import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
-import { Layers, TrendingUp, TrendingDown, Award, AlertTriangle } from "lucide-react";
+import { Layers, TrendingUp, TrendingDown, Award, AlertTriangle, Calendar, DollarSign, Phone } from "lucide-react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { DataSourceBadge } from "@/components/layout/data-source-badge";
 import { externalLinks } from "@/lib/external-links";
+import { useAccount } from "@/context/account-context";
+import { getPlatformsForAccount, type PlatformData } from "@/lib/inventory-platforms-data";
+import { format, differenceInDays, parseISO } from "date-fns";
 
-// ===== PLATFORM DATA (from Google Sheet — will be replaced by CRM + CallRail) =====
-const platforms = [
-  {
-    name: "NH Website",
-    fullName: "Nationwide Haul Website",
-    color: "#BE1E23",
-    pricePerMonth: 195,
-    monthlyData: [
-      { month: "Sep 25", calls: 72, infoSubmits: 23, leads: 95, price: 195 },
-      { month: "Oct 25", calls: 93, infoSubmits: 23, leads: 116, price: 195 },
-      { month: "Nov 25", calls: 68, infoSubmits: 25, leads: 93, price: 195 },
-      { month: "Dec 25", calls: 43, infoSubmits: 32, leads: 75, price: 195 },
-      { month: "Jan 26", calls: 67, infoSubmits: 38, leads: 105, price: 195 },
-      { month: "Feb 26", calls: 83, infoSubmits: 46, leads: 129, price: 195 },
-      { month: "Mar 26", calls: 113, infoSubmits: 19, leads: 132, price: 195 },
-    ],
-  },
-  {
-    name: "TruckPaper",
-    fullName: "Truck Paper General Ad",
-    color: "#8C0F14",
-    pricePerMonth: 6800,
-    monthlyData: [
-      { month: "Sep 25", calls: 74, infoSubmits: 52, leads: 126, price: 6800 },
-      { month: "Oct 25", calls: 109, infoSubmits: 36, leads: 145, price: 6800 },
-      { month: "Nov 25", calls: 60, infoSubmits: 30, leads: 90, price: 6800 },
-      { month: "Dec 25", calls: 78, infoSubmits: 45, leads: 123, price: 6800 },
-      { month: "Jan 26", calls: 91, infoSubmits: 59, leads: 150, price: 6800 },
-      { month: "Feb 26", calls: 81, infoSubmits: 53, leads: 134, price: 6800 },
-      { month: "Mar 26", calls: 107, infoSubmits: 60, leads: 167, price: 6800 },
-    ],
-  },
-  {
-    name: "My Little Salesman",
-    fullName: "My Little Salesman",
-    color: "#2563EB",
-    pricePerMonth: 895,
-    monthlyData: [
-      { month: "Sep 25", calls: 4, infoSubmits: 4, leads: 8, price: 895 },
-      { month: "Oct 25", calls: 10, infoSubmits: 4, leads: 14, price: 895 },
-      { month: "Nov 25", calls: 8, infoSubmits: 2, leads: 10, price: 895 },
-      { month: "Dec 25", calls: 7, infoSubmits: 5, leads: 12, price: 895 },
-      { month: "Jan 26", calls: 8, infoSubmits: 11, leads: 19, price: 895 },
-      { month: "Feb 26", calls: 7, infoSubmits: 6, leads: 13, price: 895 },
-      { month: "Mar 26", calls: 11, infoSubmits: 8, leads: 19, price: 895 },
-    ],
-  },
-  {
-    name: "Commercial Truck Trader",
-    fullName: "Commercial Truck Trader",
-    color: "#16A34A",
-    pricePerMonth: 1200,
-    monthlyData: [
-      { month: "Sep 25", calls: 12, infoSubmits: 8, leads: 20, price: 1200 },
-      { month: "Oct 25", calls: 15, infoSubmits: 10, leads: 25, price: 1200 },
-      { month: "Nov 25", calls: 9, infoSubmits: 6, leads: 15, price: 1200 },
-      { month: "Dec 25", calls: 11, infoSubmits: 7, leads: 18, price: 1200 },
-      { month: "Jan 26", calls: 14, infoSubmits: 9, leads: 23, price: 1200 },
-      { month: "Feb 26", calls: 13, infoSubmits: 8, leads: 21, price: 1200 },
-      { month: "Mar 26", calls: 16, infoSubmits: 11, leads: 27, price: 1200 },
-    ],
-  },
-  {
-    name: "Cherry Trader",
-    fullName: "Cherry Trader",
-    color: "#D97706",
-    pricePerMonth: 500,
-    monthlyData: [
-      { month: "Sep 25", calls: 3, infoSubmits: 2, leads: 5, price: 500 },
-      { month: "Oct 25", calls: 5, infoSubmits: 3, leads: 8, price: 500 },
-      { month: "Nov 25", calls: 4, infoSubmits: 2, leads: 6, price: 500 },
-      { month: "Dec 25", calls: 3, infoSubmits: 1, leads: 4, price: 500 },
-      { month: "Jan 26", calls: 6, infoSubmits: 3, leads: 9, price: 500 },
-      { month: "Feb 26", calls: 4, infoSubmits: 2, leads: 6, price: 500 },
-      { month: "Mar 26", calls: 7, infoSubmits: 4, leads: 11, price: 500 },
-    ],
-  },
-];
-
-// Compute current month (last entry) stats
-function getCurrentStats(p: typeof platforms[0]) {
+// Compute current month stats
+function getCurrentStats(p: PlatformData) {
+  if (p.monthlyData.length === 0) return { calls: 0, infoSubmits: 0, leads: 0, price: p.pricePerMonth, cpl: 0, prevCpl: 0, leadChange: 0 };
   const current = p.monthlyData[p.monthlyData.length - 1];
-  const prev = p.monthlyData[p.monthlyData.length - 2];
+  const prev = p.monthlyData.length > 1 ? p.monthlyData[p.monthlyData.length - 2] : null;
   const cpl = current.leads > 0 ? current.price / current.leads : 0;
   const prevCpl = prev && prev.leads > 0 ? prev.price / prev.leads : 0;
   const leadChange = prev ? Math.round(((current.leads - prev.leads) / prev.leads) * 100) : 0;
   return { ...current, cpl, prevCpl, leadChange };
 }
 
-// ROI Score: lower CPL = better, normalized 0-100
-function getROIScores() {
+// ROI ranking
+function getROIScores(platforms: PlatformData[]) {
   const stats = platforms.map((p) => ({ name: p.name, ...getCurrentStats(p) }));
   const maxCpl = Math.max(...stats.map((s) => s.cpl));
   return stats.map((s) => ({
@@ -109,57 +34,142 @@ function getROIScores() {
   })).sort((a, b) => b.roiScore - a.roiScore);
 }
 
-export default function InventoryPlatformsPage() {
-  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
-  const roiRanking = getROIScores();
-  const bestPerformer = roiRanking[0];
-  const worstPerformer = roiRanking[roiRanking.length - 1];
+// Days until renewal
+function daysUntilRenewal(renewalDate?: string): number | null {
+  if (!renewalDate) return null;
+  return differenceInDays(parseISO(renewalDate), new Date());
+}
 
-  // Comparison data for all platforms
-  const comparisonData = platforms[0].monthlyData.map((_, i) => {
-    const entry: any = { month: platforms[0].monthlyData[i].month }; // eslint-disable-line @typescript-eslint/no-explicit-any
-    platforms.forEach((p) => { entry[p.name] = p.monthlyData[i]?.leads || 0; });
-    return entry;
-  });
-
-  const cplComparisonData = platforms[0].monthlyData.map((_, i) => {
-    const entry: any = { month: platforms[0].monthlyData[i].month }; // eslint-disable-line @typescript-eslint/no-explicit-any
-    platforms.forEach((p) => {
-      const d = p.monthlyData[i];
-      entry[p.name] = d && d.leads > 0 ? Math.round((d.price / d.leads) * 100) / 100 : 0;
-    });
-    return entry;
-  });
-
-  const detail = selectedPlatform ? platforms.find((p) => p.name === selectedPlatform) : null;
+// NHTTR-style view: budget cards with renewal info
+function NHTTRPlatformView({ platforms }: { platforms: PlatformData[] }) {
+  const totalAnnual = platforms.reduce((sum, p) => sum + (p.annualCost || 0), 0);
 
   return (
     <div>
-      <div className="mb-4">
-        <h2 className="text-lg font-bold text-foreground">Inventory Platforms</h2>
-        <p className="text-sm text-muted-foreground">ROI analysis per listing platform — calls, info submits, cost per lead</p>
-        <DataSourceBadge sources={externalLinks["/inventory-platforms"] || []} />
+      {/* Total Budget */}
+      <div className="rounded-lg border border-border bg-card p-4 mb-4">
+        <div className="flex items-center gap-2 mb-1">
+          <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-muted-foreground">Total Annual Budget</span>
+        </div>
+        <p className="text-2xl font-bold text-foreground">{formatCurrency(totalAnnual)}<span className="text-sm font-normal text-muted-foreground">/year</span></p>
+        <p className="text-xs text-muted-foreground mt-1">{formatCurrency(Math.round(totalAnnual / 12))}/month across {platforms.length} platforms</p>
       </div>
 
-      {/* Top Performers */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 flex items-center gap-3">
-          <Award className="h-8 w-8 text-green-600" />
-          <div>
-            <p className="text-xs text-green-600 font-medium">Best ROI This Month</p>
-            <p className="text-lg font-bold text-green-800">{bestPerformer.name}</p>
-            <p className="text-xs text-green-600">{formatCurrency(bestPerformer.cpl)} per lead · {bestPerformer.leads} leads · ROI Score: {bestPerformer.roiScore}/100</p>
-          </div>
-        </div>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 flex items-center gap-3">
-          <AlertTriangle className="h-8 w-8 text-red-500" />
-          <div>
-            <p className="text-xs text-red-500 font-medium">Highest Cost Per Lead</p>
-            <p className="text-lg font-bold text-red-800">{worstPerformer.name}</p>
-            <p className="text-xs text-red-500">{formatCurrency(worstPerformer.cpl)} per lead · {worstPerformer.leads} leads · ROI Score: {worstPerformer.roiScore}/100</p>
-          </div>
-        </div>
+      {/* Platform Budget Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        {platforms.map((p) => {
+          const daysLeft = daysUntilRenewal(p.renewalDate);
+          const isUrgent = daysLeft !== null && daysLeft <= 30;
+          const isPast = daysLeft !== null && daysLeft < 0;
+
+          return (
+            <div key={p.name} className="rounded-lg border border-border bg-card p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
+                <span className="text-sm font-bold text-card-foreground">{p.fullName}</span>
+              </div>
+
+              {/* Cost */}
+              <div className="mb-3">
+                <p className="text-2xl font-bold text-card-foreground">{formatCurrency(p.annualCost || 0)}<span className="text-xs font-normal text-muted-foreground">/year</span></p>
+                <p className="text-xs text-muted-foreground">{formatCurrency(p.pricePerMonth)}/month</p>
+              </div>
+
+              {/* Renewal */}
+              {p.renewalDate && (
+                <div className={`rounded-md p-2 ${isUrgent ? "bg-amber-50 border border-amber-200" : isPast ? "bg-red-50 border border-red-200" : "bg-gray-50 border border-gray-200"}`}>
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className={`h-3 w-3 ${isUrgent ? "text-amber-600" : isPast ? "text-red-600" : "text-gray-500"}`} />
+                    <span className={`text-xs font-medium ${isUrgent ? "text-amber-700" : isPast ? "text-red-700" : "text-gray-600"}`}>
+                      Renewal: {format(parseISO(p.renewalDate), "MMM d, yyyy")}
+                    </span>
+                  </div>
+                  <p className={`text-[10px] mt-0.5 ${isUrgent ? "text-amber-600" : isPast ? "text-red-600" : "text-gray-500"}`}>
+                    {isPast ? "Overdue" : daysLeft !== null ? `${daysLeft} days remaining` : ""}
+                  </p>
+                </div>
+              )}
+
+              {/* Call stats placeholder */}
+              <div className="mt-3 pt-3 border-t border-border">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Phone className="h-3 w-3" />
+                  <span>Calls tracked via CallRail (NH Repair Shops)</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
+
+      <p className="text-[10px] text-muted-foreground text-center">Call data linked to CallRail company &quot;NH Repair Shops&quot;. Budget amounts are manually entered and editable.</p>
+    </div>
+  );
+}
+
+// Full platform view with charts and comparison (for NH/NFI)
+function FullPlatformView({ platforms }: { platforms: PlatformData[] }) {
+  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+  const hasData = platforms.some((p) => p.monthlyData.length > 0);
+  const roiRanking = hasData ? getROIScores(platforms) : [];
+  const bestPerformer = roiRanking[0];
+  const worstPerformer = roiRanking[roiRanking.length - 1];
+
+  const comparisonData = hasData && platforms[0].monthlyData.length > 0
+    ? platforms[0].monthlyData.map((_, i) => {
+        const entry: any = { month: platforms[0].monthlyData[i].month }; // eslint-disable-line @typescript-eslint/no-explicit-any
+        platforms.forEach((p) => { entry[p.name] = p.monthlyData[i]?.leads || 0; });
+        return entry;
+      })
+    : [];
+
+  const cplComparisonData = hasData && platforms[0].monthlyData.length > 0
+    ? platforms[0].monthlyData.map((_, i) => {
+        const entry: any = { month: platforms[0].monthlyData[i].month }; // eslint-disable-line @typescript-eslint/no-explicit-any
+        platforms.forEach((p) => {
+          const d = p.monthlyData[i];
+          entry[p.name] = d && d.leads > 0 ? Math.round((d.price / d.leads) * 100) / 100 : 0;
+        });
+        return entry;
+      })
+    : [];
+
+  const detail = selectedPlatform ? platforms.find((p) => p.name === selectedPlatform) : null;
+
+  if (!hasData) {
+    return (
+      <div className="text-center py-12">
+        <Layers className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+        <p className="text-sm text-muted-foreground">Platform data not yet configured for this account.</p>
+        <p className="text-xs text-muted-foreground mt-1">Data will appear here once connected to CallRail and CRM.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Top Performers */}
+      {bestPerformer && worstPerformer && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
+          <div className="rounded-lg border border-green-200 bg-green-50 p-4 flex items-center gap-3">
+            <Award className="h-8 w-8 text-green-600" />
+            <div>
+              <p className="text-xs text-green-600 font-medium">Best ROI This Month</p>
+              <p className="text-lg font-bold text-green-800">{bestPerformer.name}</p>
+              <p className="text-xs text-green-600">{formatCurrency(bestPerformer.cpl)} per lead -- {bestPerformer.leads} leads -- ROI Score: {bestPerformer.roiScore}/100</p>
+            </div>
+          </div>
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 flex items-center gap-3">
+            <AlertTriangle className="h-8 w-8 text-red-500" />
+            <div>
+              <p className="text-xs text-red-500 font-medium">Highest Cost Per Lead</p>
+              <p className="text-lg font-bold text-red-800">{worstPerformer.name}</p>
+              <p className="text-xs text-red-500">{formatCurrency(worstPerformer.cpl)} per lead -- {worstPerformer.leads} leads -- ROI Score: {worstPerformer.roiScore}/100</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Platform Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 mb-4">
@@ -196,10 +206,10 @@ export default function InventoryPlatformsPage() {
         })}
       </div>
 
-      {/* Platform Detail (when clicked) */}
-      {detail && (
+      {/* Platform Detail */}
+      {detail && detail.monthlyData.length > 0 && (
         <div className="rounded-lg border border-primary/20 bg-card p-4 mb-4">
-          <h3 className="text-sm font-bold text-card-foreground mb-3">{detail.fullName} — Monthly Trend</h3>
+          <h3 className="text-sm font-bold text-card-foreground mb-3">{detail.fullName} -- Monthly Trend</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="h-64">
               <p className="text-xs text-muted-foreground mb-2">Leads Over Time</p>
@@ -232,101 +242,130 @@ export default function InventoryPlatformsPage() {
       )}
 
       {/* Comparison Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-        {/* Leads by Platform Over Time */}
-        <div className="rounded-lg border border-border bg-card p-4">
-          <h3 className="text-sm font-semibold text-card-foreground mb-3">Leads by Platform (Monthly)</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={comparisonData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Legend />
-                {platforms.map((p) => (
-                  <Line key={p.name} type="monotone" dataKey={p.name} stroke={p.color} strokeWidth={2} dot={{ r: 3 }} />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
+      {comparisonData.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h3 className="text-sm font-semibold text-card-foreground mb-3">Leads by Platform (Monthly)</h3>
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={comparisonData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip />
+                  <Legend />
+                  {platforms.map((p) => (
+                    <Line key={p.name} type="monotone" dataKey={p.name} stroke={p.color} strokeWidth={2} dot={{ r: 3 }} />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </div>
 
-        {/* Cost Per Lead Trend */}
-        <div className="rounded-lg border border-border bg-card p-4">
-          <h3 className="text-sm font-semibold text-card-foreground mb-3">Cost Per Lead Trend (Monthly)</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={cplComparisonData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                <YAxis tickFormatter={(v) => `$${v}`} tick={{ fontSize: 10 }} />
-                <Tooltip formatter={(v: any) => formatCurrency(Number(v))} /> {/* eslint-disable-line @typescript-eslint/no-explicit-any */}
-                <Legend />
-                {platforms.map((p) => (
-                  <Line key={p.name} type="monotone" dataKey={p.name} stroke={p.color} strokeWidth={2} dot={{ r: 3 }} />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h3 className="text-sm font-semibold text-card-foreground mb-3">Cost Per Lead Trend (Monthly)</h3>
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={cplComparisonData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                  <YAxis tickFormatter={(v) => `$${v}`} tick={{ fontSize: 10 }} />
+                  <Tooltip formatter={(v: any) => formatCurrency(Number(v))} /> {/* eslint-disable-line @typescript-eslint/no-explicit-any */}
+                  <Legend />
+                  {platforms.map((p) => (
+                    <Line key={p.name} type="monotone" dataKey={p.name} stroke={p.color} strokeWidth={2} dot={{ r: 3 }} />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Full Platform Comparison Table */}
-      <div className="rounded-lg border border-border bg-card overflow-hidden mb-4">
-        <div className="px-4 py-3 border-b border-border bg-muted/30">
-          <h3 className="text-sm font-semibold text-card-foreground">Platform Comparison — March 2026</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="px-4 py-2 text-left font-medium text-muted-foreground">Platform</th>
-                <th className="px-4 py-2 text-right font-medium text-muted-foreground">Price/Mo</th>
-                <th className="px-4 py-2 text-right font-medium text-muted-foreground">Calls</th>
-                <th className="px-4 py-2 text-right font-medium text-muted-foreground">Info Submits</th>
-                <th className="px-4 py-2 text-right font-medium text-muted-foreground">Total Leads</th>
-                <th className="px-4 py-2 text-right font-medium text-muted-foreground">Cost/Lead</th>
-                <th className="px-4 py-2 text-right font-medium text-muted-foreground">vs Prev Month</th>
-                <th className="px-4 py-2 text-right font-medium text-muted-foreground">ROI Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {roiRanking.map((s, i) => (
-                <tr key={s.name} className={`border-b border-border last:border-0 ${i === 0 ? "bg-green-50" : ""}`}>
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: platforms.find((p) => p.name === s.name)?.color }} />
-                      <span className="font-medium text-card-foreground">{s.name}</span>
-                      {i === 0 && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Best</span>}
-                    </div>
-                  </td>
-                  <td className="px-4 py-2.5 text-right">{formatCurrency(s.price)}</td>
-                  <td className="px-4 py-2.5 text-right">{s.calls}</td>
-                  <td className="px-4 py-2.5 text-right">{s.infoSubmits}</td>
-                  <td className="px-4 py-2.5 text-right font-bold">{s.leads}</td>
-                  <td className="px-4 py-2.5 text-right font-bold text-primary">{formatCurrency(s.cpl)}</td>
-                  <td className="px-4 py-2.5 text-right">
-                    <span className={s.leadChange > 0 ? "text-green-600" : s.leadChange < 0 ? "text-red-500" : "text-muted-foreground"}>
-                      {s.leadChange > 0 ? "+" : ""}{s.leadChange}%
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <div className="w-12 h-2 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full rounded-full bg-primary" style={{ width: `${s.roiScore}%` }} />
-                      </div>
-                      <span className="text-xs font-medium">{s.roiScore}</span>
-                    </div>
-                  </td>
+      {roiRanking.length > 0 && (
+        <div className="rounded-lg border border-border bg-card overflow-hidden mb-4">
+          <div className="px-4 py-3 border-b border-border bg-muted/30">
+            <h3 className="text-sm font-semibold text-card-foreground">Platform Comparison</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">Platform</th>
+                  <th className="px-4 py-2 text-right font-medium text-muted-foreground">Price/Mo</th>
+                  <th className="px-4 py-2 text-right font-medium text-muted-foreground">Calls</th>
+                  <th className="px-4 py-2 text-right font-medium text-muted-foreground">Info Submits</th>
+                  <th className="px-4 py-2 text-right font-medium text-muted-foreground">Total Leads</th>
+                  <th className="px-4 py-2 text-right font-medium text-muted-foreground">Cost/Lead</th>
+                  <th className="px-4 py-2 text-right font-medium text-muted-foreground">vs Prev Month</th>
+                  <th className="px-4 py-2 text-right font-medium text-muted-foreground">ROI Score</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {roiRanking.map((s, i) => (
+                  <tr key={s.name} className={`border-b border-border last:border-0 ${i === 0 ? "bg-green-50" : ""}`}>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: platforms.find((p) => p.name === s.name)?.color }} />
+                        <span className="font-medium text-card-foreground">{s.name}</span>
+                        {i === 0 && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Best</span>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-right">{formatCurrency(s.price)}</td>
+                    <td className="px-4 py-2.5 text-right">{s.calls}</td>
+                    <td className="px-4 py-2.5 text-right">{s.infoSubmits}</td>
+                    <td className="px-4 py-2.5 text-right font-bold">{s.leads}</td>
+                    <td className="px-4 py-2.5 text-right font-bold text-primary">{formatCurrency(s.cpl)}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <span className={s.leadChange > 0 ? "text-green-600" : s.leadChange < 0 ? "text-red-500" : "text-muted-foreground"}>
+                        {s.leadChange > 0 ? "+" : ""}{s.leadChange}%
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <div className="w-12 h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full rounded-full bg-primary" style={{ width: `${s.roiScore}%` }} />
+                        </div>
+                        <span className="text-xs font-medium">{s.roiScore}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       <p className="text-[10px] text-muted-foreground text-center">Data source: Google Sheet (Fleet Sales List). Will be connected to CRM + CallRail for live data.</p>
+    </div>
+  );
+}
+
+export default function InventoryPlatformsPage() {
+  const { currentAccount } = useAccount();
+  const platforms = getPlatformsForAccount(currentAccount.id);
+  const isNHTTR = currentAccount.id === "nhttr";
+
+  return (
+    <div>
+      <div className="mb-4">
+        <h2 className="text-lg font-bold text-foreground">Inventory Platforms</h2>
+        <p className="text-sm text-muted-foreground">
+          {isNHTTR
+            ? "Breakdown service listings -- budget tracking and call performance"
+            : "ROI analysis per listing platform -- calls, info submits, cost per lead"
+          }
+        </p>
+        <DataSourceBadge sources={externalLinks["/inventory-platforms"] || []} />
+      </div>
+
+      {isNHTTR ? (
+        <NHTTRPlatformView platforms={platforms} />
+      ) : (
+        <FullPlatformView platforms={platforms} />
+      )}
     </div>
   );
 }

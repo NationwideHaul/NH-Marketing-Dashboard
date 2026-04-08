@@ -42,12 +42,12 @@ const SWR_CONFIG = {
 // Main hook — fetches from real API and extracts metric
 export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
   const { dateRange } = useDateRange();
-  const { currentAccount } = useAccount();
+  const { apiAccountId } = useAccount();
   const startDate = format(dateRange.from, "yyyy-MM-dd");
   const endDate = format(dateRange.to, "yyyy-MM-dd");
   const route = getApiRoute(config.dataSource);
   const sep = route.includes("?") ? "&" : "?";
-  const url = `${route}${sep}startDate=${startDate}&endDate=${endDate}&accountId=${currentAccount.id}`;
+  const url = `${route}${sep}startDate=${startDate}&endDate=${endDate}&accountId=${apiAccountId}`;
 
   const { data } = useSWR(url, fetcher, SWR_CONFIG);
 
@@ -71,13 +71,13 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
 // If config.dimension is set, fetches a separate GA4 query with that dimension
 export function useWidgetTimeSeries(config: WidgetConfig): { date: string; value: number }[] {
   const { dateRange } = useDateRange();
-  const { currentAccount } = useAccount();
+  const { apiAccountId } = useAccount();
   const startDate = format(dateRange.from, "yyyy-MM-dd");
   const endDate = format(dateRange.to, "yyyy-MM-dd");
   const route = getApiRoute(config.dataSource);
   const sep = route.includes("?") ? "&" : "?";
   const dimensionParam = config.dimension ? `&dimension=${config.dimension}` : "";
-  const url = `${route}${sep}startDate=${startDate}&endDate=${endDate}&accountId=${currentAccount.id}${dimensionParam}`;
+  const url = `${route}${sep}startDate=${startDate}&endDate=${endDate}&accountId=${apiAccountId}${dimensionParam}`;
 
   const { data } = useSWR(url, fetcher, {
     refreshInterval: 300000,
@@ -99,12 +99,12 @@ export function useWidgetTimeSeries(config: WidgetConfig): { date: string; value
 // For table widgets — returns all metrics
 export function useWidgetAllMetrics(config: WidgetConfig): KPIMetric[] {
   const { dateRange } = useDateRange();
-  const { currentAccount } = useAccount();
+  const { apiAccountId } = useAccount();
   const startDate = format(dateRange.from, "yyyy-MM-dd");
   const endDate = format(dateRange.to, "yyyy-MM-dd");
   const route = getApiRoute(config.dataSource);
   const sep = route.includes("?") ? "&" : "?";
-  const url = `${route}${sep}startDate=${startDate}&endDate=${endDate}&accountId=${currentAccount.id}`;
+  const url = `${route}${sep}startDate=${startDate}&endDate=${endDate}&accountId=${apiAccountId}`;
 
   const { data } = useSWR(url, fetcher, {
     refreshInterval: 300000,
