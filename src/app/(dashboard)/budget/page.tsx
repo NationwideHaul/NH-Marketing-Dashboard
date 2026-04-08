@@ -7,6 +7,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend,
 } from "recharts";
 import { formatCurrency } from "@/lib/utils";
+import { DataSourceBadge } from "@/components/layout/data-source-badge";
+import { externalLinks } from "@/lib/external-links";
 
 const COLORS = ["#BE1E23", "#8C0F14", "#2563EB", "#16A34A", "#D97706", "#7C3AED", "#DB2777", "#0891B2"];
 
@@ -106,6 +108,7 @@ export default function BudgetPage() {
         <div>
           <h2 className="text-lg font-bold text-foreground">Budget Overview</h2>
           <p className="text-sm text-muted-foreground">Monthly spend tracking — click the pencil to edit any row</p>
+          <DataSourceBadge sources={externalLinks["/budget"] || []} />
         </div>
       </div>
 

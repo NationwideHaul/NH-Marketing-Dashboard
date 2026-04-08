@@ -2,9 +2,12 @@
 
 import { useCallback, useRef, useState, useEffect } from "react";
 import { ResponsiveGridLayout } from "react-grid-layout";
+import { usePathname } from "next/navigation";
 import { useDashboard } from "@/context/dashboard-context";
 import { WidgetWrapper } from "./widget-wrapper";
 import { WidgetPicker } from "./widget-picker";
+import { DataSourceBadge } from "@/components/layout/data-source-badge";
+import { externalLinks } from "@/lib/external-links";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 
@@ -18,7 +21,9 @@ interface WidgetPageProps {
 }
 
 export function WidgetPage({ title, description, headerContent }: WidgetPageProps) {
+  const pathname = usePathname();
   const { widgets, layouts, editMode, showPicker, updateLayouts } = useDashboard();
+  const sources = externalLinks[pathname || "/"] || [];
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1200);
 
@@ -47,6 +52,7 @@ export function WidgetPage({ title, description, headerContent }: WidgetPageProp
         <div className="mb-4">
           {title && <h2 className="text-lg font-bold text-foreground">{title}</h2>}
           {description && <p className="text-sm text-muted-foreground">{description}</p>}
+          {sources.length > 0 && <DataSourceBadge sources={sources} />}
           {headerContent}
         </div>
       )}

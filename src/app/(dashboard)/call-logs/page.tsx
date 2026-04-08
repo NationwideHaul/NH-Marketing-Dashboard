@@ -10,7 +10,8 @@ import {
 import { Phone, PhoneIncoming, PhoneMissed, Clock, TrendingUp, Users, Filter } from "lucide-react";
 import { useDateRange } from "@/context/date-range-context";
 import { formatNumber, formatPercent } from "@/lib/utils";
-import { WidgetPage } from "@/components/widgets/widget-page";
+import { DataSourceBadge } from "@/components/layout/data-source-badge";
+import { externalLinks } from "@/lib/external-links";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 const COLORS = ["#BE1E23", "#8C0F14", "#2563EB", "#16A34A", "#D97706", "#7C3AED", "#DB2777", "#0891B2", "#65A30D", "#DC2626"];
@@ -49,6 +50,7 @@ export default function CallLogsPage() {
       <div className="mb-4">
         <h2 className="text-lg font-bold text-foreground">Call Logs</h2>
         <p className="text-sm text-muted-foreground">CallRail marketing attribution + RingCentral call volume</p>
+        <DataSourceBadge sources={externalLinks["/call-logs"] || []} />
       </div>
 
       {isLoading && (

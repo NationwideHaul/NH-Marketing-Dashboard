@@ -7,6 +7,8 @@ import {
 } from "recharts";
 import { Layers, TrendingUp, TrendingDown, Award, AlertTriangle } from "lucide-react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { DataSourceBadge } from "@/components/layout/data-source-badge";
+import { externalLinks } from "@/lib/external-links";
 
 // ===== PLATFORM DATA (from Google Sheet — will be replaced by CRM + CallRail) =====
 const platforms = [
@@ -136,6 +138,7 @@ export default function InventoryPlatformsPage() {
       <div className="mb-4">
         <h2 className="text-lg font-bold text-foreground">Inventory Platforms</h2>
         <p className="text-sm text-muted-foreground">ROI analysis per listing platform — calls, info submits, cost per lead</p>
+        <DataSourceBadge sources={externalLinks["/inventory-platforms"] || []} />
       </div>
 
       {/* Top Performers */}
