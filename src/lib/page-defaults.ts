@@ -200,6 +200,121 @@ export const emailDefaults: PageDefault = {
   },
 };
 
+// ==================== META ADS ====================
+export const metaAdsDefaults: PageDefault = {
+  widgets: [
+    { id: "ma-1", type: "stat", title: "Amount Spent", dataSource: "meta-ads", metric: "spend", format: "currency", comparisonEnabled: true },
+    { id: "ma-2", type: "stat", title: "Impressions", dataSource: "meta-ads", metric: "impressions", format: "number", comparisonEnabled: true },
+    { id: "ma-3", type: "stat", title: "Reach", dataSource: "meta-ads", metric: "reach", format: "number", comparisonEnabled: true },
+    { id: "ma-4", type: "stat", title: "Clicks", dataSource: "meta-ads", metric: "clicks", format: "number", comparisonEnabled: true },
+    { id: "ma-5", type: "stat", title: "CTR", dataSource: "meta-ads", metric: "ctr", format: "percent", comparisonEnabled: true },
+    { id: "ma-6", type: "stat", title: "CPC", dataSource: "meta-ads", metric: "cpc", format: "currency", comparisonEnabled: true },
+    { id: "ma-7", type: "stat", title: "Leads", dataSource: "meta-ads", metric: "conversions", format: "number", comparisonEnabled: true },
+    { id: "ma-8", type: "stat", title: "Cost Per Lead", dataSource: "meta-ads", metric: "costPerLead", format: "currency", comparisonEnabled: true },
+    { id: "ma-9", type: "area-chart", title: "Spend Over Time", dataSource: "meta-ads", metric: "spend", format: "currency" },
+    { id: "ma-10", type: "line-chart", title: "Reach Over Time", dataSource: "meta-ads", metric: "reach", format: "number" },
+    { id: "ma-11", type: "table", title: "Campaign Performance", dataSource: "meta-ads", metric: "spend", format: "currency" },
+  ],
+  layouts: {
+    lg: [
+      ...row([{ id: "ma-1", w: 3, h: 2 }, { id: "ma-2", w: 3, h: 2 }, { id: "ma-3", w: 3, h: 2 }, { id: "ma-4", w: 3, h: 2 }], 0),
+      ...row([{ id: "ma-5", w: 3, h: 2 }, { id: "ma-6", w: 3, h: 2 }, { id: "ma-7", w: 3, h: 2 }, { id: "ma-8", w: 3, h: 2 }], 2),
+      ...row([{ id: "ma-9", w: 6, h: 5, minW: 3, minH: 3 }, { id: "ma-10", w: 6, h: 5, minW: 3, minH: 3 }], 4),
+      ...row([{ id: "ma-11", w: 12, h: 6, minW: 6, minH: 4 }], 9),
+    ],
+    md: [
+      ...row([{ id: "ma-1", w: 2, h: 2 }, { id: "ma-2", w: 2, h: 2 }, { id: "ma-3", w: 2, h: 2 }, { id: "ma-4", w: 2, h: 2 }], 0),
+      ...row([{ id: "ma-5", w: 2, h: 2 }, { id: "ma-6", w: 2, h: 2 }, { id: "ma-7", w: 2, h: 2 }, { id: "ma-8", w: 2, h: 2 }], 2),
+      ...row([{ id: "ma-9", w: 4, h: 5, minW: 3, minH: 3 }, { id: "ma-10", w: 4, h: 5, minW: 3, minH: 3 }], 4),
+      ...row([{ id: "ma-11", w: 8, h: 6, minW: 4, minH: 4 }], 9),
+    ],
+  },
+};
+
+// ==================== SOCIAL MEDIA SUB-TABS ====================
+export const facebookDefaults: PageDefault = {
+  widgets: [
+    { id: "fb-1", type: "stat", title: "Views", dataSource: "facebook", metric: "pageViews", format: "number", comparisonEnabled: true },
+    { id: "fb-2", type: "stat", title: "Interactions", dataSource: "facebook", metric: "postEngagement", format: "number", comparisonEnabled: true },
+    { id: "fb-3", type: "stat", title: "Follows", dataSource: "facebook", metric: "followers", format: "number", comparisonEnabled: true },
+    { id: "fb-4", type: "stat", title: "Reach", dataSource: "facebook", metric: "reach", format: "number", comparisonEnabled: true },
+    { id: "fb-5", type: "area-chart", title: "Reach Over Time", dataSource: "facebook", metric: "reach", format: "number" },
+    { id: "fb-6", type: "bar-chart", title: "Engagement Over Time", dataSource: "facebook", metric: "postEngagement", format: "number" },
+  ],
+  layouts: {
+    lg: [
+      ...row([{ id: "fb-1", w: 3, h: 2 }, { id: "fb-2", w: 3, h: 2 }, { id: "fb-3", w: 3, h: 2 }, { id: "fb-4", w: 3, h: 2 }], 0),
+      ...row([{ id: "fb-5", w: 6, h: 5, minW: 3, minH: 3 }, { id: "fb-6", w: 6, h: 5, minW: 3, minH: 3 }], 2),
+    ],
+    md: [
+      ...row([{ id: "fb-1", w: 2, h: 2 }, { id: "fb-2", w: 2, h: 2 }, { id: "fb-3", w: 2, h: 2 }, { id: "fb-4", w: 2, h: 2 }], 0),
+      ...row([{ id: "fb-5", w: 4, h: 5, minW: 3, minH: 3 }, { id: "fb-6", w: 4, h: 5, minW: 3, minH: 3 }], 2),
+    ],
+  },
+};
+
+export const instagramDefaults: PageDefault = {
+  widgets: [
+    { id: "ig-1", type: "stat", title: "Followers", dataSource: "instagram", metric: "followers", format: "number", comparisonEnabled: true },
+    { id: "ig-2", type: "stat", title: "Reach", dataSource: "instagram", metric: "reach", format: "number", comparisonEnabled: true },
+    { id: "ig-3", type: "stat", title: "Likes", dataSource: "instagram", metric: "likes", format: "number", comparisonEnabled: true },
+    { id: "ig-4", type: "stat", title: "Saves", dataSource: "instagram", metric: "saves", format: "number", comparisonEnabled: true },
+    { id: "ig-5", type: "area-chart", title: "Reach Over Time", dataSource: "instagram", metric: "reach", format: "number" },
+    { id: "ig-6", type: "bar-chart", title: "Engagement Over Time", dataSource: "instagram", metric: "likes", format: "number" },
+  ],
+  layouts: {
+    lg: [
+      ...row([{ id: "ig-1", w: 3, h: 2 }, { id: "ig-2", w: 3, h: 2 }, { id: "ig-3", w: 3, h: 2 }, { id: "ig-4", w: 3, h: 2 }], 0),
+      ...row([{ id: "ig-5", w: 6, h: 5, minW: 3, minH: 3 }, { id: "ig-6", w: 6, h: 5, minW: 3, minH: 3 }], 2),
+    ],
+    md: [
+      ...row([{ id: "ig-1", w: 2, h: 2 }, { id: "ig-2", w: 2, h: 2 }, { id: "ig-3", w: 2, h: 2 }, { id: "ig-4", w: 2, h: 2 }], 0),
+      ...row([{ id: "ig-5", w: 4, h: 5, minW: 3, minH: 3 }, { id: "ig-6", w: 4, h: 5, minW: 3, minH: 3 }], 2),
+    ],
+  },
+};
+
+export const youtubeDefaults: PageDefault = {
+  widgets: [
+    { id: "yt-1", type: "stat", title: "Views", dataSource: "youtube", metric: "views", format: "number", comparisonEnabled: true },
+    { id: "yt-2", type: "stat", title: "Watch Time (hrs)", dataSource: "youtube", metric: "watchTime", format: "number", comparisonEnabled: true },
+    { id: "yt-3", type: "stat", title: "Subscribers", dataSource: "youtube", metric: "subscribers", format: "number", comparisonEnabled: true },
+    { id: "yt-4", type: "stat", title: "Likes", dataSource: "youtube", metric: "likes", format: "number", comparisonEnabled: true },
+    { id: "yt-5", type: "area-chart", title: "Views Over Time", dataSource: "youtube", metric: "views", format: "number" },
+    { id: "yt-6", type: "bar-chart", title: "Likes Over Time", dataSource: "youtube", metric: "likes", format: "number" },
+  ],
+  layouts: {
+    lg: [
+      ...row([{ id: "yt-1", w: 3, h: 2 }, { id: "yt-2", w: 3, h: 2 }, { id: "yt-3", w: 3, h: 2 }, { id: "yt-4", w: 3, h: 2 }], 0),
+      ...row([{ id: "yt-5", w: 6, h: 5, minW: 3, minH: 3 }, { id: "yt-6", w: 6, h: 5, minW: 3, minH: 3 }], 2),
+    ],
+    md: [
+      ...row([{ id: "yt-1", w: 2, h: 2 }, { id: "yt-2", w: 2, h: 2 }, { id: "yt-3", w: 2, h: 2 }, { id: "yt-4", w: 2, h: 2 }], 0),
+      ...row([{ id: "yt-5", w: 4, h: 5, minW: 3, minH: 3 }, { id: "yt-6", w: 4, h: 5, minW: 3, minH: 3 }], 2),
+    ],
+  },
+};
+
+export const linkedinDefaults: PageDefault = {
+  widgets: [
+    { id: "li-1", type: "stat", title: "Impressions", dataSource: "linkedin", metric: "impressions", format: "number", comparisonEnabled: true },
+    { id: "li-2", type: "stat", title: "Clicks", dataSource: "linkedin", metric: "clicks", format: "number", comparisonEnabled: true },
+    { id: "li-3", type: "stat", title: "Followers", dataSource: "linkedin", metric: "followers", format: "number", comparisonEnabled: true },
+    { id: "li-4", type: "stat", title: "CTR", dataSource: "linkedin", metric: "ctr", format: "percent", comparisonEnabled: true },
+    { id: "li-5", type: "area-chart", title: "Impressions Over Time", dataSource: "linkedin", metric: "impressions", format: "number" },
+  ],
+  layouts: {
+    lg: [
+      ...row([{ id: "li-1", w: 3, h: 2 }, { id: "li-2", w: 3, h: 2 }, { id: "li-3", w: 3, h: 2 }, { id: "li-4", w: 3, h: 2 }], 0),
+      ...row([{ id: "li-5", w: 12, h: 5, minW: 6, minH: 3 }], 2),
+    ],
+    md: [
+      ...row([{ id: "li-1", w: 2, h: 2 }, { id: "li-2", w: 2, h: 2 }, { id: "li-3", w: 2, h: 2 }, { id: "li-4", w: 2, h: 2 }], 0),
+      ...row([{ id: "li-5", w: 8, h: 5, minW: 4, minH: 3 }], 2),
+    ],
+  },
+};
+
 // Map page path to defaults
 export const pageDefaults: Record<string, PageDefault> = {
   "/": overviewDefaults,
@@ -208,4 +323,9 @@ export const pageDefaults: Record<string, PageDefault> = {
   "/gmb": gmbDefaults,
   "/call-logs": callLogsDefaults,
   "/go-high-level": emailDefaults,
+  "/meta-ads": metaAdsDefaults,
+  "/social-media": facebookDefaults,
+  "/social-media/instagram": instagramDefaults,
+  "/social-media/youtube": youtubeDefaults,
+  "/social-media/linkedin": linkedinDefaults,
 };

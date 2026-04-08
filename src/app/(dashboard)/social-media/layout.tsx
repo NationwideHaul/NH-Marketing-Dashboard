@@ -9,7 +9,6 @@ const subTabs = [
   { label: "Instagram", href: "/social-media/instagram" },
   { label: "YouTube", href: "/social-media/youtube" },
   { label: "LinkedIn", href: "/social-media/linkedin" },
-  { label: "Meta Ads", href: "/social-media/meta-ads" },
 ];
 
 export default function SocialMediaLayout({
@@ -24,7 +23,7 @@ export default function SocialMediaLayout({
       <div className="mb-6">
         <h2 className="text-xl font-bold text-foreground">Social Media</h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Organic and paid social performance
+          Organic social performance and content
         </p>
         <div className="flex gap-1 border-b border-border">
           {subTabs.map((tab) => {
