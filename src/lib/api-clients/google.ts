@@ -27,7 +27,8 @@ export async function getGA4Data(
   refreshToken: string | undefined,
   propertyId: string,
   startDate: string, // YYYY-MM-DD
-  endDate: string
+  endDate: string,
+  dimension?: string // optional: "deviceCategory", "sessionDefaultChannelGroup", "sessionSource", etc.
 ) {
   const auth = getAuthenticatedClient(accessToken, refreshToken);
 
@@ -35,19 +36,27 @@ export async function getGA4Data(
     authClient: auth as any, // eslint-disable-line @typescript-eslint/no-explicit-any
   });
 
+  // Use custom dimension if provided, otherwise default to date
+  const dimensionName = dimension || "date";
+  const metrics = [
+    { name: "sessions" },
+    { name: "totalUsers" },
+    { name: "screenPageViews" },
+    { name: "bounceRate" },
+    { name: "averageSessionDuration" },
+    { name: "conversions" },
+  ];
+
+  const orderBys = dimension
+    ? [{ metric: { metricName: "sessions" }, desc: true }]
+    : [{ dimension: { dimensionName: "date" } }];
+
   const [response] = await analyticsData.runReport({
     property: `properties/${propertyId}`,
     dateRanges: [{ startDate, endDate }],
-    dimensions: [{ name: "date" }],
-    metrics: [
-      { name: "sessions" },
-      { name: "totalUsers" },
-      { name: "screenPageViews" },
-      { name: "bounceRate" },
-      { name: "averageSessionDuration" },
-      { name: "conversions" },
-    ],
-    orderBys: [{ dimension: { dimensionName: "date" } }],
+    dimensions: [{ name: dimensionName }],
+    metrics,
+    orderBys,
   });
 
   return response;

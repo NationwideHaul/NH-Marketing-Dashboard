@@ -111,7 +111,7 @@ export function Header() {
       {showDatePicker && typeof window !== "undefined" && createPortal(
         <div className="fixed inset-0 flex items-start justify-end pt-14 pr-4" style={{ zIndex: 9999 }}>
           <div className="absolute inset-0" onClick={() => setShowDatePicker(false)} />
-          <div className="relative bg-white rounded-lg shadow-xl border border-gray-200 p-4 max-w-[640px]">
+          <div className="relative bg-white rounded-lg shadow-xl border border-gray-200 p-4 max-w-[640px] max-h-[calc(100vh-4rem)] overflow-y-auto">
             {/* Presets */}
             <div className="flex flex-wrap gap-1.5 mb-3 pb-3 border-b border-gray-200">
               {presets.map((p) => (

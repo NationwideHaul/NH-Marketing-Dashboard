@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
   const startDate = searchParams.get("startDate") || "30daysAgo";
   const endDate = searchParams.get("endDate") || "today";
   const accountId = searchParams.get("accountId") || "nationwide-haul";
+  const dimension = searchParams.get("dimension") || undefined; // e.g. "deviceCategory", "sessionDefaultChannelGroup"
 
   // Get account-specific credentials
   const creds = getAccountCredentials(accountId);
@@ -32,7 +33,8 @@ export async function GET(request: NextRequest) {
       (session as any).refreshToken, // eslint-disable-line @typescript-eslint/no-explicit-any
       propertyId,
       startDate,
-      endDate
+      endDate,
+      dimension
     );
 
     return NextResponse.json({
@@ -40,6 +42,7 @@ export async function GET(request: NextRequest) {
       status: "live",
       accountId,
       propertyId,
+      dimension: dimension || "date",
       data,
     });
   } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any

@@ -30,6 +30,7 @@ export interface WidgetConfig {
   format: "number" | "currency" | "percent";
   comparisonEnabled?: boolean;
   goalValue?: number;
+  dimension?: string; // GA4 dimension override (e.g. "deviceCategory", "sessionDefaultChannelGroup", "sessionSource")
 }
 
 export interface LayoutItem {

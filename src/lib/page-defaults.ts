@@ -53,13 +53,13 @@ export const gaDefaults: PageDefault = {
     { id: "ga-4", type: "stat", title: "Bounce Rate", dataSource: "google-analytics", metric: "bounceRate", format: "percent", comparisonEnabled: true },
     // Row 2: Traffic over time + Users by channel
     { id: "ga-5", type: "area-chart", title: "Traffic Over Time", dataSource: "google-analytics", metric: "sessions", format: "number" },
-    { id: "ga-6", type: "bar-chart", title: "Users by Channel", dataSource: "google-analytics", metric: "users", format: "number" },
+    { id: "ga-6", type: "bar-chart", title: "Users by Channel", dataSource: "google-analytics", metric: "users", format: "number", dimension: "sessionDefaultChannelGroup" },
     // Row 3: Search/Organic/Paid
     { id: "ga-7", type: "stat", title: "Organic Traffic", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true },
     { id: "ga-8", type: "stat", title: "Conversions", dataSource: "google-analytics", metric: "conversions", format: "number", comparisonEnabled: true },
     { id: "ga-9", type: "stat", title: "Avg. Session Duration", dataSource: "google-analytics", metric: "avgSessionDuration", format: "number", comparisonEnabled: true },
     // Row 4: Device + Engagement chart
-    { id: "ga-10", type: "pie-chart", title: "Device Distribution", dataSource: "google-analytics", metric: "sessions", format: "number" },
+    { id: "ga-10", type: "pie-chart", title: "Device Distribution", dataSource: "google-analytics", metric: "sessions", format: "number", dimension: "deviceCategory" },
     { id: "ga-11", type: "line-chart", title: "Engagement Over Time", dataSource: "google-analytics", metric: "pageViews", format: "number" },
   ],
   layouts: {

@@ -68,6 +68,7 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
 }
 
 // For charts — returns time series from API
+// If config.dimension is set, fetches a separate GA4 query with that dimension
 export function useWidgetTimeSeries(config: WidgetConfig): { date: string; value: number }[] {
   const { dateRange } = useDateRange();
   const { currentAccount } = useAccount();
@@ -75,7 +76,8 @@ export function useWidgetTimeSeries(config: WidgetConfig): { date: string; value
   const endDate = format(dateRange.to, "yyyy-MM-dd");
   const route = getApiRoute(config.dataSource);
   const sep = route.includes("?") ? "&" : "?";
-  const url = `${route}${sep}startDate=${startDate}&endDate=${endDate}&accountId=${currentAccount.id}`;
+  const dimensionParam = config.dimension ? `&dimension=${config.dimension}` : "";
+  const url = `${route}${sep}startDate=${startDate}&endDate=${endDate}&accountId=${currentAccount.id}${dimensionParam}`;
 
   const { data } = useSWR(url, fetcher, {
     refreshInterval: 300000,
@@ -84,6 +86,11 @@ export function useWidgetTimeSeries(config: WidgetConfig): { date: string; value
   });
 
   if (!data || !data.data) return [];
+
+  // If dimension query, extract category-based data instead of time series
+  if (config.dimension && data.data?.rows) {
+    return extractDimensionData(data, config.metric);
+  }
 
   // Try to extract time series from the response
   return extractTimeSeries(data, config.metric) || [];
@@ -184,6 +191,18 @@ function extractTimeSeries(apiResponse: any, metric: string): { date: string; va
   }
 
   return null;
+}
+
+// Extract category-based data from GA4 dimension queries (e.g. deviceCategory, channelGroup)
+function extractDimensionData(apiResponse: any, metric: string): { date: string; value: number }[] { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const d = apiResponse.data;
+  if (!d?.rows) return [];
+  const metricIndex = getGA4MetricIndex(metric);
+  const idx = metricIndex >= 0 ? metricIndex : 0; // default to sessions (index 0)
+  return d.rows.map((row: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+    date: row.dimensionValues?.[0]?.value || "Unknown",
+    value: parseFloat(row.metricValues?.[idx]?.value || "0"),
+  })).filter((p: any) => p.value > 0); // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 function extractAllMetrics(apiResponse: any, dataSource: string): KPIMetric[] { // eslint-disable-line @typescript-eslint/no-explicit-any
