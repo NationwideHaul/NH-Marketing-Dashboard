@@ -39,7 +39,13 @@ export function ChartWidget({ config }: { config: WidgetConfig }) {
   }, [rawData]);
 
   if (data.length === 0) {
-    return <div className="flex items-center justify-center h-full text-sm text-gray-400">No data</div>;
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center px-4">
+        <span className="text-lg mb-1">{ds?.icon}</span>
+        <p className="text-sm text-gray-400">No data available</p>
+        <p className="text-[10px] text-gray-300">Sign in or check API connection</p>
+      </div>
+    );
   }
 
   const total = metric?.value ?? data.reduce((s, d) => s + d.value, 0);

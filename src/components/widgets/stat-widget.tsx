@@ -16,19 +16,31 @@ export function StatWidget({ config }: { config: WidgetConfig }) {
   // Aggregate for sparkline
   const sparkData = aggregateWeekly(timeSeries).map((p) => ({ v: p.value }));
 
-  const value = metric?.value ?? 0;
+  if (!metric) {
+    return (
+      <div className="flex flex-col justify-center h-full px-4">
+        <div className="flex items-center gap-1.5 mb-1">
+          <span className="text-xs">{ds?.icon}</span>
+          <span className="text-[10px] text-gray-400 truncate">{config.title}</span>
+        </div>
+        <p className="text-lg text-gray-300">—</p>
+        <p className="text-[10px] text-gray-300">Sign in to connect</p>
+      </div>
+    );
+  }
+
+  const value = metric.value ?? 0;
   const formattedValue =
     config.format === "currency" ? formatCurrency(value)
     : config.format === "percent" ? formatPercent(value)
     : formatNumber(value);
 
-  const trend = metric?.trend || "flat";
-  const change = metric?.changePercent || 0;
+  const trend = metric.trend || "flat";
+  const change = metric.changePercent || 0;
   const TrendIcon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
 
   return (
     <div className="relative flex flex-col justify-between h-full px-4 py-3 overflow-hidden">
-      {/* Sparkline background */}
       {sparkData.length > 2 && (
         <div className="absolute inset-0 top-[40%] opacity-[0.08]">
           <ResponsiveContainer width="100%" height="100%">
@@ -39,7 +51,6 @@ export function StatWidget({ config }: { config: WidgetConfig }) {
         </div>
       )}
 
-      {/* Content */}
       <div className="relative z-10">
         <div className="flex items-center gap-1.5 mb-1">
           <span className="text-xs">{ds?.icon}</span>

@@ -26,7 +26,18 @@ function getApiRoute(dataSource: string): string {
   return routes[dataSource] || "/api/google-analytics";
 }
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = (url: string) => fetch(url).then((r) => {
+  if (!r.ok && r.status === 401) return { status: "error", error: "Not authenticated" };
+  return r.json();
+}).catch(() => ({ status: "error", error: "Network error" }));
+
+const SWR_CONFIG = {
+  refreshInterval: 300000,
+  revalidateOnFocus: false,
+  dedupingInterval: 60000,
+  errorRetryCount: 1,
+  shouldRetryOnError: false,
+};
 
 // Main hook — fetches from real API and extracts metric
 export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
@@ -38,11 +49,7 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
   const sep = route.includes("?") ? "&" : "?";
   const url = `${route}${sep}startDate=${startDate}&endDate=${endDate}&accountId=${currentAccount.id}`;
 
-  const { data } = useSWR(url, fetcher, {
-    refreshInterval: 300000, // 5 min
-    revalidateOnFocus: false,
-    dedupingInterval: 60000,
-  });
+  const { data } = useSWR(url, fetcher, SWR_CONFIG);
 
   if (!data || data.status === "error") return null;
 
