@@ -235,48 +235,7 @@ export default function CallLogsPage() {
             </div>
           </div>
 
-          {/* Row 5: Recent Calls Table */}
-          <div className="rounded-lg border border-border bg-card overflow-hidden">
-            <div className="px-4 py-3 border-b border-border bg-muted/30">
-              <h3 className="text-sm font-semibold text-card-foreground">Recent Calls</h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="px-4 py-2 text-left font-medium text-muted-foreground">Caller</th>
-                    <th className="px-4 py-2 text-left font-medium text-muted-foreground">Source</th>
-                    <th className="px-4 py-2 text-right font-medium text-muted-foreground">Duration</th>
-                    <th className="px-4 py-2 text-center font-medium text-muted-foreground">Status</th>
-                    <th className="px-4 py-2 text-center font-medium text-muted-foreground">First Call</th>
-                    <th className="px-4 py-2 text-right font-medium text-muted-foreground">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cr.recentCalls?.map((c: any, i: number) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
-                    <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/20">
-                      <td className="px-4 py-2.5 font-medium text-card-foreground">{c.caller}</td>
-                      <td className="px-4 py-2.5 text-muted-foreground">{c.source}</td>
-                      <td className="px-4 py-2.5 text-right">{c.duration}s</td>
-                      <td className="px-4 py-2.5 text-center">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                          c.answered ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                        }`}>
-                          {c.answered ? "Answered" : "Missed"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-center">
-                        {c.firstCall && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">New</span>}
-                      </td>
-                      <td className="px-4 py-2.5 text-right text-muted-foreground text-xs">
-                        {c.date ? format(new Date(c.date), "MMM d, h:mm a") : ""}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {/* Recent Calls removed per user request */}
         </>
       )}
 
