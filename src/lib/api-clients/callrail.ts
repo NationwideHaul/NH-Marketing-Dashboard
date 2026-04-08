@@ -31,7 +31,6 @@ export async function getCalls(
     start_date: startDate,
     end_date: endDate,
     per_page: String(perPage),
-    fields: "caller_name,caller_number,duration,tracking_phone_number,source,answered,created_at,direction,first_call,lead_status",
   });
 
   const response = await fetch(
