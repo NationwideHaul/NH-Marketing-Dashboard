@@ -1,58 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getMetaAdsCampaigns,
-  getMetaAdsAccountInsights,
-  getFacebookPageInsights,
-  getFacebookPageData,
-  getInstagramInsights,
-  getInstagramProfile,
-  getInstagramMedia,
-} from "@/lib/api-clients/meta";
+import { getMetaAdsCampaigns, getMetaAdsAccountInsights, getFacebookPageInsights, getFacebookPageData, getInstagramInsights, getInstagramProfile, getInstagramMedia } from "@/lib/api-clients/meta";
+import { getAccountCredentials } from "@/lib/account-credentials";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const type = searchParams.get("type") || "ads"; // ads | facebook | instagram | ig-profile | ig-media
+  const type = searchParams.get("type") || "ads";
   const since = searchParams.get("since") || "";
   const until = searchParams.get("until") || "";
+  const accountId = searchParams.get("accountId") || "nationwide-haul";
 
-  const accessToken = process.env.META_ACCESS_TOKEN;
+  const creds = getAccountCredentials(accountId);
+  const accessToken = creds.metaAccessToken;
+
   if (!accessToken) {
-    return NextResponse.json({
-      platform: "meta",
-      status: "mock",
-      message: "META_ACCESS_TOKEN not configured. Showing mock data.",
-    });
+    return NextResponse.json({ platform: "meta", status: "error", error: `Meta not configured for account: ${accountId}` });
   }
 
   try {
     let data;
-
-    if (type === "ads") {
-      const adAccountId = process.env.META_AD_ACCOUNT_ID || "";
-      data = await getMetaAdsAccountInsights(adAccountId, accessToken, since, until);
-    } else if (type === "campaigns") {
-      const adAccountId = process.env.META_AD_ACCOUNT_ID || "";
-      data = await getMetaAdsCampaigns(adAccountId, accessToken, since, until);
+    if (type === "ads" || type === "campaigns") {
+      const adAccountId = creds.metaAdAccountId || "";
+      data = type === "campaigns"
+        ? await getMetaAdsCampaigns(adAccountId, accessToken, since, until)
+        : await getMetaAdsAccountInsights(adAccountId, accessToken, since, until);
     } else if (type === "facebook") {
-      const pageId = process.env.META_PAGE_ID || "me";
-      data = await getFacebookPageInsights(pageId, accessToken, since, until);
+      data = await getFacebookPageInsights(creds.metaPageId || "me", accessToken, since, until);
     } else if (type === "facebook-page") {
-      const pageId = process.env.META_PAGE_ID || "me";
-      data = await getFacebookPageData(pageId, accessToken);
+      data = await getFacebookPageData(creds.metaPageId || "me", accessToken);
     } else if (type === "instagram") {
-      const igUserId = process.env.META_IG_USER_ID || "";
-      data = await getInstagramInsights(igUserId, accessToken, since, until);
+      data = await getInstagramInsights(creds.metaIgUserId || "", accessToken, since, until);
     } else if (type === "ig-profile") {
-      const igUserId = process.env.META_IG_USER_ID || "";
-      data = await getInstagramProfile(igUserId, accessToken);
+      data = await getInstagramProfile(creds.metaIgUserId || "", accessToken);
     } else if (type === "ig-media") {
-      const igUserId = process.env.META_IG_USER_ID || "";
-      data = await getInstagramMedia(igUserId, accessToken);
+      data = await getInstagramMedia(creds.metaIgUserId || "", accessToken);
     }
-
-    return NextResponse.json({ platform: "meta", status: "live", data });
+    return NextResponse.json({ platform: "meta", status: "live", accountId, data });
   } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-    console.error("Meta API error:", error.message);
     return NextResponse.json({ platform: "meta", status: "error", error: error.message }, { status: 500 });
   }
 }

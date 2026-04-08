@@ -1,0 +1,73 @@
+// Server-side account credentials mapping
+// This file is ONLY used in API routes (server-side)
+// Each account has its own set of API credentials
+
+export interface AccountCredentials {
+  ga4PropertyId?: string;
+  googleAdsCustomerId?: string;
+  googleAdsDeveloperToken?: string;
+  callrailCompanyName?: string;
+  ghlLocationId?: string;
+  ghlApiKey?: string;
+  metaAdAccountId?: string;
+  metaAccessToken?: string;
+  metaPageId?: string;
+  metaIgUserId?: string;
+  youtubeChannelId?: string;
+  ringcentralEnabled?: boolean;
+}
+
+const accountCredentials: Record<string, AccountCredentials> = {
+  "nationwide-haul": {
+    ga4PropertyId: "333711970",
+    googleAdsCustomerId: "4504773990",
+    googleAdsDeveloperToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    callrailCompanyName: "Nationwide Haul",
+    ghlLocationId: process.env.GHL_LOCATION_ID || "IEs4Gwg925sPu0AYNpdS",
+    ghlApiKey: process.env.GHL_API_KEY,
+    metaAdAccountId: process.env.META_AD_ACCOUNT_ID,
+    metaAccessToken: process.env.META_ACCESS_TOKEN,
+    metaPageId: process.env.META_PAGE_ID,
+    metaIgUserId: process.env.META_IG_USER_ID,
+    youtubeChannelId: "UCjWMfLksDwfwVA-u3xkhnhg",
+    ringcentralEnabled: true,
+  },
+  "nfi-truck-sales": {
+    ga4PropertyId: "354503352",
+    googleAdsCustomerId: "4307362539",
+    googleAdsDeveloperToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    callrailCompanyName: "NFI Truck Sales",
+    ghlLocationId: "bQFOVHhca9fD7V3faeS1",
+    ghlApiKey: process.env.GHL_API_KEY, // Same agency key, different location
+    ringcentralEnabled: true,
+  },
+  "nhttr": {
+    // Default to RV — toggle handled by subService param
+    ga4PropertyId: "528221425",
+    googleAdsCustomerId: "1073209892",
+    googleAdsDeveloperToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    callrailCompanyName: "NH Repair Shops",
+    ringcentralEnabled: true,
+  },
+  "nhttr-rv": {
+    ga4PropertyId: "528221425",
+    googleAdsCustomerId: "1073209892",
+    googleAdsDeveloperToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    callrailCompanyName: "NH Repair Shops",
+    ringcentralEnabled: true,
+  },
+  "nhttr-ttr": {
+    ga4PropertyId: "528269534",
+    googleAdsCustomerId: "6515085474",
+    googleAdsDeveloperToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    callrailCompanyName: "NH Repair Shops",
+    ringcentralEnabled: true,
+  },
+  "road-ready": {
+    // TBD — no credentials yet
+  },
+};
+
+export function getAccountCredentials(accountId: string): AccountCredentials {
+  return accountCredentials[accountId] || accountCredentials["nationwide-haul"];
+}

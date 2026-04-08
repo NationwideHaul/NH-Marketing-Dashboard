@@ -9,6 +9,7 @@ import {
 } from "recharts";
 import { Phone, PhoneIncoming, PhoneMissed, Clock, TrendingUp, Users, Filter } from "lucide-react";
 import { useDateRange } from "@/context/date-range-context";
+import { useAccount } from "@/context/account-context";
 import { formatNumber, formatPercent } from "@/lib/utils";
 import { DataSourceBadge } from "@/components/layout/data-source-badge";
 import { externalLinks } from "@/lib/external-links";
@@ -33,11 +34,12 @@ function StatCard({ icon: Icon, label, value, subtitle, color = "text-card-foreg
 
 export default function CallLogsPage() {
   const { dateRange } = useDateRange();
+  const { currentAccount } = useAccount();
   const startDate = format(dateRange.from, "yyyy-MM-dd");
   const endDate = format(dateRange.to, "yyyy-MM-dd");
 
   const { data, isLoading } = useSWR(
-    `/api/call-logs?startDate=${startDate}&endDate=${endDate}`,
+    `/api/call-logs?startDate=${startDate}&endDate=${endDate}&accountId=${currentAccount.id}`,
     fetcher,
     { refreshInterval: 300000, revalidateOnFocus: false }
   );

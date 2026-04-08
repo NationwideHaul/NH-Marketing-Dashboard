@@ -1,19 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getGA4Data } from "@/lib/api-clients/google";
+import { getAccountCredentials } from "@/lib/account-credentials";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const startDate = searchParams.get("startDate") || "30daysAgo";
   const endDate = searchParams.get("endDate") || "today";
+  const accountId = searchParams.get("accountId") || "nationwide-haul";
 
-  // Check if Google credentials are configured
-  const propertyId = process.env.GA4_PROPERTY_ID;
+  // Get account-specific credentials
+  const creds = getAccountCredentials(accountId);
+  const propertyId = creds.ga4PropertyId;
+
   if (!propertyId || !process.env.GOOGLE_CLIENT_ID) {
     return NextResponse.json({
       platform: "google-analytics",
-      status: "mock",
-      message: "GA4_PROPERTY_ID or GOOGLE_CLIENT_ID not configured. Showing mock data.",
+      status: "error",
+      error: `GA4 not configured for account: ${accountId}`,
     });
   }
 
@@ -34,10 +38,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       platform: "google-analytics",
       status: "live",
+      accountId,
+      propertyId,
       data,
     });
   } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-    console.error("GA4 API error:", error.message);
+    console.error(`GA4 API error (${accountId}, property ${propertyId}):`, error.message);
     return NextResponse.json({
       platform: "google-analytics",
       status: "error",
