@@ -1,17 +1,13 @@
 "use client";
 
-import { BarChart3 } from "lucide-react";
-import { PlatformPage } from "@/components/dashboard/platform-page";
-import { chartConfigs } from "@/lib/chart-configs";
+import { WidgetPage } from "@/components/widgets/widget-page";
 
 export default function GoogleAnalyticsPage() {
   return (
-    <PlatformPage
+    <WidgetPage
+      filter="google-analytics"
       title="Google Analytics"
-      description="Website traffic and user behavior"
-      icon={BarChart3}
-      platform="google-analytics"
-      chartConfigs={chartConfigs["google-analytics"]}
+      description="Website traffic and user behavior — add widgets to customize this view"
     />
   );
 }

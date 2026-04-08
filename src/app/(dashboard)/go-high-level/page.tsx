@@ -1,17 +1,13 @@
 "use client";
 
-import { Mail } from "lucide-react";
-import { PlatformPage } from "@/components/dashboard/platform-page";
-import { chartConfigs } from "@/lib/chart-configs";
+import { WidgetPage } from "@/components/widgets/widget-page";
 
-export default function GoHighLevelPage() {
+export default function EmailMarketingPage() {
   return (
-    <PlatformPage
-      title="Go High Level"
-      description="Email marketing and CRM"
-      icon={Mail}
-      platform="go-high-level"
-      chartConfigs={chartConfigs["go-high-level"]}
+    <WidgetPage
+      filter="email-marketing"
+      title="Email Marketing"
+      description="GoHighLevel email campaigns and CRM — add widgets to customize this view"
     />
   );
 }

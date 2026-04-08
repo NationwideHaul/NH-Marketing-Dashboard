@@ -1,19 +1,13 @@
 "use client";
 
-import { MapPin } from "lucide-react";
-import { PlatformPage } from "@/components/dashboard/platform-page";
-import { SocialPreview } from "@/components/dashboard/social-preview";
-import { chartConfigs } from "@/lib/chart-configs";
+import { WidgetPage } from "@/components/widgets/widget-page";
 
 export default function GMBPage() {
   return (
-    <PlatformPage
+    <WidgetPage
+      filter="gmb"
       title="Google My Business"
-      description="Local presence and discovery"
-      icon={MapPin}
-      platform="gmb"
-      chartConfigs={chartConfigs.gmb}
-      socialPreview={<SocialPreview platform="gmb" />}
+      description="Local presence and discovery — add widgets to customize this view"
     />
   );
 }

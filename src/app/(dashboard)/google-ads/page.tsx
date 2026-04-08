@@ -1,17 +1,13 @@
 "use client";
 
-import { DollarSign } from "lucide-react";
-import { PlatformPage } from "@/components/dashboard/platform-page";
-import { chartConfigs } from "@/lib/chart-configs";
+import { WidgetPage } from "@/components/widgets/widget-page";
 
 export default function GoogleAdsPage() {
   return (
-    <PlatformPage
+    <WidgetPage
+      filter="google-ads"
       title="Google Ads"
-      description="Paid search campaign performance"
-      icon={DollarSign}
-      platform="google-ads"
-      chartConfigs={chartConfigs["google-ads"]}
+      description="Paid search campaign performance — add widgets to customize this view"
     />
   );
 }

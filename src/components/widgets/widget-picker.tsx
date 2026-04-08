@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useDashboard } from "@/context/dashboard-context";
 import { dataSources, widgetTypeLabels, getMetricOptions } from "@/lib/widget-registry";
@@ -36,9 +38,12 @@ export function WidgetPicker() {
     setShowPicker(false);
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex justify-end" onClick={() => setShowPicker(false)}>
-      <div className="w-full max-w-md bg-card h-full overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  const panel = (
+    <div className="fixed inset-0 bg-black/40 flex justify-end" style={{ zIndex: 9999 }} onClick={() => setShowPicker(false)}>
+      <div className="w-full max-w-md bg-white h-full overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-border sticky top-0 bg-card z-10">
           <h2 className="text-sm font-bold text-card-foreground">Add Widget</h2>
           <button onClick={() => setShowPicker(false)} className="p-1 rounded hover:bg-muted"><X className="h-4 w-4" /></button>
@@ -80,4 +85,7 @@ export function WidgetPicker() {
       </div>
     </div>
   );
+
+  if (!mounted) return null;
+  return createPortal(panel, document.body);
 }
