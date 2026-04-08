@@ -1,139 +1,173 @@
 "use client";
 
-import { useMemo } from "react";
-import { Wallet } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Wallet, Pencil, Check } from "lucide-react";
 import {
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
+  ResponsiveContainer, PieChart, Pie, Cell, Tooltip,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend,
 } from "recharts";
-import { useDateRange } from "@/context/date-range-context";
-import { getKPIMetrics } from "@/lib/mock-data";
 import { formatCurrency } from "@/lib/utils";
 
-const COLORS = ["#BE1E23", "#8C0F14", "#2563EB", "#16A34A", "#D97706", "#7C3AED", "#DB2777"];
+const COLORS = ["#BE1E23", "#8C0F14", "#2563EB", "#16A34A", "#D97706", "#7C3AED", "#DB2777", "#0891B2"];
 
-const budgetAllocations = [
-  { platform: "Google Ads", budget: 10000, key: "google-ads", metricKey: "spend" },
-  { platform: "Meta Ads", budget: 7500, key: "meta-ads", metricKey: "spend" },
-  { platform: "LinkedIn Ads", budget: 5000, key: "linkedin", metricKey: "adSpend" },
-  { platform: "RingCentral", budget: 500, key: "ringcentral", metricKey: null },
-  { platform: "Go High Level", budget: 300, key: "go-high-level", metricKey: null },
+const STORAGE_KEY = "nh-budget-allocations-v1";
+
+interface BudgetRow {
+  platform: string;
+  budget: number;
+  spent: number; // Real spend from APIs or manual
+  category: "advertising" | "platform" | "tools";
+}
+
+// Default budgets — user can edit these
+const defaultBudgets: BudgetRow[] = [
+  { platform: "Google Ads", budget: 5000, spent: 0, category: "advertising" },
+  { platform: "Meta Ads", budget: 7500, spent: 0, category: "advertising" },
+  { platform: "TruckPaper", budget: 6800, spent: 6800, category: "platform" },
+  { platform: "My Little Salesman", budget: 895, spent: 895, category: "platform" },
+  { platform: "Commercial Truck Trader", budget: 1200, spent: 1200, category: "platform" },
+  { platform: "Cherry Trader", budget: 500, spent: 500, category: "platform" },
+  { platform: "NH Website", budget: 195, spent: 195, category: "platform" },
+  { platform: "Go High Level", budget: 297, spent: 297, category: "tools" },
+  { platform: "RingCentral", budget: 450, spent: 450, category: "tools" },
+  { platform: "CallRail", budget: 145, spent: 145, category: "tools" },
 ];
 
+function loadBudgets(): BudgetRow[] {
+  if (typeof window === "undefined") return defaultBudgets;
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    try { return JSON.parse(saved); } catch { return defaultBudgets; }
+  }
+  return defaultBudgets;
+}
+
+function saveBudgets(budgets: BudgetRow[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(budgets));
+}
+
 export default function BudgetPage() {
-  const { dateRange } = useDateRange();
+  const [budgets, setBudgets] = useState<BudgetRow[]>(defaultBudgets);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editBudget, setEditBudget] = useState<string>("");
+  const [editSpent, setEditSpent] = useState<string>("");
+  const [loaded, setLoaded] = useState(false);
 
-  const budgetData = useMemo(() => {
-    return budgetAllocations.map((b, i) => {
-      let spent = 0;
-      if (b.metricKey) {
-        const metrics = getKPIMetrics(b.key, dateRange);
-        const metric = metrics.find((m) => m.id === b.metricKey);
-        spent = metric?.value ?? 0;
-      } else {
-        spent = b.budget * 0.7; // estimate for non-ad platforms
-      }
-      return {
-        ...b,
-        spent: Math.round(spent),
-        remaining: Math.max(0, b.budget - Math.round(spent)),
-        pacing: Math.round((spent / b.budget) * 100),
-        fill: COLORS[i % COLORS.length],
-      };
-    });
-  }, [dateRange]);
+  useEffect(() => {
+    setBudgets(loadBudgets());
+    setLoaded(true);
+  }, []);
 
-  const totalBudget = budgetData.reduce((sum, b) => sum + b.budget, 0);
-  const totalSpent = budgetData.reduce((sum, b) => sum + b.spent, 0);
+  useEffect(() => {
+    if (loaded) saveBudgets(budgets);
+  }, [budgets, loaded]);
+
+  const totalBudget = budgets.reduce((s, b) => s + b.budget, 0);
+  const totalSpent = budgets.reduce((s, b) => s + b.spent, 0);
   const totalRemaining = totalBudget - totalSpent;
 
-  const pieData = budgetData.map((b) => ({
-    name: b.platform,
-    value: b.spent,
-    fill: b.fill,
+  const adSpend = budgets.filter((b) => b.category === "advertising").reduce((s, b) => s + b.spent, 0);
+  const platformSpend = budgets.filter((b) => b.category === "platform").reduce((s, b) => s + b.spent, 0);
+  const toolsSpend = budgets.filter((b) => b.category === "tools").reduce((s, b) => s + b.spent, 0);
+
+  const pieData = budgets.filter((b) => b.spent > 0).map((b, i) => ({
+    name: b.platform, value: b.spent, fill: COLORS[i % COLORS.length],
   }));
+
+  const barData = budgets.map((b) => ({
+    platform: b.platform, budget: b.budget, spent: b.spent,
+  }));
+
+  const startEdit = (idx: number) => {
+    setEditingIdx(idx);
+    setEditBudget(String(budgets[idx].budget));
+    setEditSpent(String(budgets[idx].spent));
+  };
+
+  const saveEdit = () => {
+    if (editingIdx === null) return;
+    const updated = [...budgets];
+    updated[editingIdx] = {
+      ...updated[editingIdx],
+      budget: parseFloat(editBudget) || 0,
+      spent: parseFloat(editSpent) || 0,
+    };
+    setBudgets(updated);
+    setEditingIdx(null);
+  };
+
+  if (!loaded) return null;
 
   return (
     <div>
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-          <Wallet className="h-5 w-5 text-primary" />
-        </div>
+      <div className="mb-4 flex items-center gap-3">
+        <Wallet className="h-5 w-5 text-primary" />
         <div>
-          <h2 className="text-xl font-bold text-foreground">Budget Overview</h2>
-          <p className="text-sm text-muted-foreground">Spend tracking and budget pacing per platform</p>
+          <h2 className="text-lg font-bold text-foreground">Budget Overview</h2>
+          <p className="text-sm text-muted-foreground">Monthly spend tracking — click the pencil to edit any row</p>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div className="rounded-lg border border-border bg-card p-5">
-          <p className="text-sm text-muted-foreground">Total Budget</p>
-          <p className="mt-1 text-2xl font-bold text-card-foreground">{formatCurrency(totalBudget)}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground">Total Budget</p>
+          <p className="text-xl font-bold text-card-foreground">{formatCurrency(totalBudget)}</p>
         </div>
-        <div className="rounded-lg border border-border bg-card p-5">
-          <p className="text-sm text-muted-foreground">Total Spent</p>
-          <p className="mt-1 text-2xl font-bold text-primary">{formatCurrency(totalSpent)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{Math.round((totalSpent / totalBudget) * 100)}% of budget</p>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground">Total Spent</p>
+          <p className="text-xl font-bold text-primary">{formatCurrency(totalSpent)}</p>
+          <p className="text-[10px] text-muted-foreground">{totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0}% of budget</p>
         </div>
-        <div className="rounded-lg border border-border bg-card p-5">
-          <p className="text-sm text-muted-foreground">Remaining</p>
-          <p className="mt-1 text-2xl font-bold text-green-600">{formatCurrency(totalRemaining)}</p>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground">Advertising</p>
+          <p className="text-xl font-bold text-red-600">{formatCurrency(adSpend)}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground">Platforms</p>
+          <p className="text-xl font-bold text-blue-600">{formatCurrency(platformSpend)}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground">Remaining</p>
+          <p className={`text-xl font-bold ${totalRemaining >= 0 ? "text-green-600" : "text-red-500"}`}>{formatCurrency(totalRemaining)}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Spend by Platform Pie */}
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <div className="rounded-lg border border-border bg-card p-4">
-          <h3 className="text-sm font-medium text-card-foreground mb-4">Spend by Platform</h3>
+          <h3 className="text-sm font-semibold text-card-foreground mb-3">Spend Distribution</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={90}
-                  paddingAngle={3}
-                  dataKey="value"
-                >
-                  {pieData.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius="40%" outerRadius="70%" paddingAngle={2} dataKey="value">
+                  {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
-                <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                <Tooltip formatter={(v) => formatCurrency(Number(v))} />
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="flex flex-wrap gap-3 justify-center mt-2">
-            {pieData.map((d) => (
-              <div key={d.name} className="flex items-center gap-1.5 text-xs">
-                <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: d.fill }} />
+          <div className="flex flex-wrap gap-2 justify-center mt-2">
+            {pieData.map((d, i) => (
+              <div key={d.name} className="flex items-center gap-1 text-[10px]">
+                <div className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                 {d.name}
               </div>
             ))}
           </div>
         </div>
 
-        {/* Budget vs Spent Bar */}
         <div className="rounded-lg border border-border bg-card p-4">
-          <h3 className="text-sm font-medium text-card-foreground mb-4">Budget vs Spent</h3>
+          <h3 className="text-sm font-semibold text-card-foreground mb-3">Budget vs Spent</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={budgetData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                <XAxis type="number" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`} tick={{ fontSize: 11 }} />
-                <YAxis type="category" dataKey="platform" width={100} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+              <BarChart data={barData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis type="number" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`} tick={{ fontSize: 10 }} />
+                <YAxis type="category" dataKey="platform" width={120} tick={{ fontSize: 9 }} />
+                <Tooltip formatter={(v) => formatCurrency(Number(v))} />
+                <Legend />
                 <Bar dataKey="budget" name="Budget" fill="#E5E5E5" radius={[0, 2, 2, 0]} />
                 <Bar dataKey="spent" name="Spent" fill="#BE1E23" radius={[0, 2, 2, 0]} />
               </BarChart>
@@ -142,50 +176,85 @@ export default function BudgetPage() {
         </div>
       </div>
 
-      {/* Detailed Table */}
+      {/* Editable Table */}
       <div className="rounded-lg border border-border bg-card overflow-hidden">
-        <div className="px-4 py-3 border-b border-border bg-muted/50">
-          <h3 className="text-sm font-medium text-card-foreground">Budget Breakdown</h3>
+        <div className="px-4 py-3 border-b border-border bg-muted/30">
+          <h3 className="text-sm font-semibold text-card-foreground">Budget Breakdown — click ✏️ to edit</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
                 <th className="px-4 py-2 text-left font-medium text-muted-foreground">Platform</th>
+                <th className="px-4 py-2 text-left font-medium text-muted-foreground">Category</th>
                 <th className="px-4 py-2 text-right font-medium text-muted-foreground">Budget</th>
                 <th className="px-4 py-2 text-right font-medium text-muted-foreground">Spent</th>
                 <th className="px-4 py-2 text-right font-medium text-muted-foreground">Remaining</th>
                 <th className="px-4 py-2 text-right font-medium text-muted-foreground">Pacing</th>
+                <th className="px-4 py-2 text-center font-medium text-muted-foreground w-10"></th>
               </tr>
             </thead>
             <tbody>
-              {budgetData.map((b) => (
-                <tr key={b.platform} className="border-b border-border last:border-0">
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: b.fill }} />
-                      <span className="font-medium text-card-foreground">{b.platform}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-2.5 text-right">{formatCurrency(b.budget)}</td>
-                  <td className="px-4 py-2.5 text-right font-medium">{formatCurrency(b.spent)}</td>
-                  <td className="px-4 py-2.5 text-right text-green-600">{formatCurrency(b.remaining)}</td>
-                  <td className="px-4 py-2.5 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all"
-                          style={{
-                            width: `${Math.min(100, b.pacing)}%`,
-                            backgroundColor: b.pacing > 90 ? "#EF4444" : b.pacing > 70 ? "#D97706" : "#16A34A",
-                          }}
-                        />
+              {budgets.map((b, i) => {
+                const remaining = b.budget - b.spent;
+                const pacing = b.budget > 0 ? Math.round((b.spent / b.budget) * 100) : 0;
+                const isEditing = editingIdx === i;
+
+                return (
+                  <tr key={b.platform} className="border-b border-border last:border-0">
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                        <span className="font-medium text-card-foreground">{b.platform}</span>
                       </div>
-                      <span className="text-xs text-muted-foreground w-8">{b.pacing}%</span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                        b.category === "advertising" ? "bg-red-100 text-red-700" :
+                        b.category === "platform" ? "bg-blue-100 text-blue-700" :
+                        "bg-gray-100 text-gray-600"
+                      }`}>{b.category}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      {isEditing ? (
+                        <input type="number" value={editBudget} onChange={(e) => setEditBudget(e.target.value)}
+                          className="w-24 px-2 py-1 text-xs border border-primary rounded text-right" autoFocus />
+                      ) : formatCurrency(b.budget)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-medium text-primary">
+                      {isEditing ? (
+                        <input type="number" value={editSpent} onChange={(e) => setEditSpent(e.target.value)}
+                          className="w-24 px-2 py-1 text-xs border border-primary rounded text-right" />
+                      ) : formatCurrency(b.spent)}
+                    </td>
+                    <td className={`px-4 py-2.5 text-right ${remaining >= 0 ? "text-green-600" : "text-red-500"}`}>
+                      {formatCurrency(remaining)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <div className="w-14 h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full rounded-full" style={{
+                            width: `${Math.min(100, pacing)}%`,
+                            backgroundColor: pacing > 100 ? "#EF4444" : pacing > 90 ? "#D97706" : "#16A34A",
+                          }} />
+                        </div>
+                        <span className="text-xs w-8 text-right">{pacing}%</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      {isEditing ? (
+                        <button onClick={saveEdit} className="p-1 rounded hover:bg-green-100">
+                          <Check className="h-3.5 w-3.5 text-green-600" />
+                        </button>
+                      ) : (
+                        <button onClick={() => startEdit(i)} className="p-1 rounded hover:bg-muted">
+                          <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
