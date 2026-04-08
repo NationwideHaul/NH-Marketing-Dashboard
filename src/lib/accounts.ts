@@ -19,6 +19,7 @@ export interface SubAccount {
     youtubeChannelId?: string;
   };
   inventoryPlatforms?: string[]; // Which inventory platforms this account uses
+  subServices?: { id: string; name: string; ga4PropertyId: string; googleAdsCustomerId: string; website: string }[];
 }
 
 export const accounts: SubAccount[] = [
@@ -71,7 +72,7 @@ export const accounts: SubAccount[] = [
   },
   {
     id: "nhttr",
-    name: "NHTTR",
+    name: "NHTTR Service & Repair",
     shortName: "NHTTR",
     logo: "/nhttr-logo.png",
     colors: {
@@ -80,8 +81,22 @@ export const accounts: SubAccount[] = [
       sidebar: "#1A1A1A",
       accent: "#BE1E23",
     },
-    tabs: ["overview"], // TBD — add more tabs when configured
-    config: {},
+    tabs: [
+      "overview", "google-analytics", "google-ads", "gmb",
+      "inventory-platforms", "call-logs",
+    ],
+    config: {
+      // Dual properties — RV and TTR
+      ga4PropertyId: "528221425", // NH RV (default view)
+      googleAdsCustomerId: "1073209892", // NH RV (default view)
+      callrailCompanyId: "NH Repair Shops",
+    },
+    // Extra config for the toggle
+    subServices: [
+      { id: "rv", name: "RV & Bus Repair", ga4PropertyId: "528221425", googleAdsCustomerId: "1073209892", website: "nhrvrepair.com" },
+      { id: "ttr", name: "Truck & Trailer Repair", ga4PropertyId: "528269534", googleAdsCustomerId: "6515085474", website: "nhtrucktrailerrepair.com" },
+    ],
+    inventoryPlatforms: ["NTTS", "Find Truck Service", "TruckDown"],
   },
   {
     id: "road-ready",
