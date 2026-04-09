@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
   // Determine which location to query
   let locationId = locationIdParam;
-  let accountIdForGmb = process.env.GMB_ACCOUNT_ID;
+  const accountIdForGmb = process.env.GMB_ACCOUNT_ID;
 
   // If account has GMB locations configured, use the first one (or the specified one)
   if (creds.gmbLocations?.length) {
