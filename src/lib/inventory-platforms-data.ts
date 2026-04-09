@@ -103,9 +103,9 @@ const nhttrPlatforms: PlatformData[] = [
     name: "NTTS",
     fullName: "NTTS Breakdown Service",
     color: "#BE1E23",
-    pricePerMonth: Math.round(1288 / 12),
+    pricePerMonth: Math.round(100 / 12),
     billingCycle: "annual",
-    annualCost: 1288,
+    annualCost: 100,
     renewalDate: "2026-04-02",
     monthlyData: [], // Will be populated from CallRail
   },

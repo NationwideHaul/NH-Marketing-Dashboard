@@ -7,8 +7,10 @@ import { Calendar, ChevronDown, GitCompareArrows, Pencil, Plus, RotateCcw } from
 import { format, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { useDateRange } from "@/context/date-range-context";
 import { useDashboard } from "@/context/dashboard-context";
+import { useAccount } from "@/context/account-context";
 import { cn } from "@/lib/utils";
 import { createPortal } from "react-dom";
+import { SubServiceToggle } from "./sub-service-toggle";
 
 const presets = [
   { label: "Last 7 days", getDates: () => ({ from: subDays(new Date(), 7), to: new Date() }) },
@@ -41,8 +43,9 @@ export function Header() {
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <h1 className="text-base font-semibold text-foreground">Marketing Dashboard</h1>
+        <SubServiceToggle />
       </div>
 
       <div className="flex items-center gap-2">
