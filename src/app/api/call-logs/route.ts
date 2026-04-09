@@ -54,10 +54,13 @@ export async function GET(request: NextRequest) {
         const trackers = trackersData.trackers || [];
         const trackerNameMap: Record<string, string> = {};
         trackers.forEach((t: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-          // Map both raw number and formatted number to the tracker name
-          const num = String(t.tracking_phone_number || "").replace(/\D/g, "");
-          if (num) trackerNameMap[num] = t.name;
-          if (t.tracking_phone_number) trackerNameMap[t.tracking_phone_number] = t.name;
+          // tracking_numbers is an array (e.g. ["+18632014144"])
+          const numbers = t.tracking_numbers || [];
+          numbers.forEach((n: string) => {
+            trackerNameMap[n] = t.name; // e.g. "+18632014144" -> "Google Ads RV - Lakeland Shop"
+            const digits = n.replace(/\D/g, "");
+            if (digits) trackerNameMap[digits] = t.name; // also map "18632014144"
+          });
         });
 
         const summary = await getCallSummary(crAccountId, startDate, endDate, companyId || undefined);
