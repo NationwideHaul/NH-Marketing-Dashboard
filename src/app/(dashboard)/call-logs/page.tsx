@@ -34,12 +34,12 @@ function StatCard({ icon: Icon, label, value, subtitle, color = "text-card-foreg
 
 export default function CallLogsPage() {
   const { dateRange } = useDateRange();
-  const { currentAccount } = useAccount();
+  const { apiAccountId } = useAccount();
   const startDate = format(dateRange.from, "yyyy-MM-dd");
   const endDate = format(dateRange.to, "yyyy-MM-dd");
 
   const { data, isLoading } = useSWR(
-    `/api/call-logs?startDate=${startDate}&endDate=${endDate}&accountId=${currentAccount.id}`,
+    `/api/call-logs?startDate=${startDate}&endDate=${endDate}&accountId=${apiAccountId}`,
     fetcher,
     { refreshInterval: 300000, revalidateOnFocus: false }
   );
@@ -142,7 +142,8 @@ export default function CallLogsPage() {
 
             {/* Calls by Day of Week */}
             <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="text-sm font-semibold text-card-foreground mb-3">Calls by Day of Week</h3>
+              <h3 className="text-sm font-semibold text-card-foreground mb-1">Calls by Day of Week</h3>
+              <p className="text-[10px] text-muted-foreground mb-3">Total calls for the selected date range</p>
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={cr.byDayOfWeek}>
@@ -159,44 +160,33 @@ export default function CallLogsPage() {
             </div>
           </div>
 
-          {/* Row 3: Source Breakdown Pie + Call Heatmap */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-            {/* Source Pie */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="text-sm font-semibold text-card-foreground mb-3">Calls by Source (Distribution)</h3>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={cr.bySource?.slice(0, 8).map((s: any, i: number) => ({ name: s.source, value: s.total, fill: COLORS[i % COLORS.length] }))} // eslint-disable-line @typescript-eslint/no-explicit-any
-                      cx="50%" cy="50%" innerRadius="35%" outerRadius="65%" paddingAngle={2} dataKey="value"
-                    >
-                      {cr.bySource?.slice(0, 8).map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)} {/* eslint-disable-line @typescript-eslint/no-explicit-any */}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-2 justify-center">
-                {cr.bySource?.slice(0, 8).map((s: any, i: number) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
-                  <div key={s.source} className="flex items-center gap-1 text-[10px]">
-                    <div className="h-2 w-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                    <span>{s.source}: {s.total}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Calls by Hour */}
+          {/* Row 3: Calls by Hour */}
+          <div className="mb-4">
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold text-card-foreground mb-3">Calls by Hour of Day</h3>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={cr.byHour}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="hour" tickFormatter={(h) => `${h}:00`} tick={{ fontSize: 10 }} />
+                    <XAxis
+                      dataKey="hour"
+                      tickFormatter={(h) => {
+                        if (h === 0) return "12 AM";
+                        if (h === 12) return "12 PM";
+                        return h > 12 ? `${h - 12} PM` : `${h} AM`;
+                      }}
+                      tick={{ fontSize: 10 }}
+                    />
                     <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip labelFormatter={(h) => `${h}:00 - ${h}:59`} />
+                    <Tooltip
+                      labelFormatter={(h) => {
+                        const hr = Number(h);
+                        const start = hr === 0 ? "12:00 AM" : hr === 12 ? "12:00 PM" : hr > 12 ? `${hr - 12}:00 PM` : `${hr}:00 AM`;
+                        const endHr = hr + 1;
+                        const end = endHr === 12 ? "12:59 PM" : endHr > 12 ? `${endHr - 12}:59 PM` : `${endHr === 0 ? 12 : endHr}:59 AM`;
+                        return `${start} - ${end}`;
+                      }}
+                    />
                     <Area type="monotone" dataKey="count" stroke="#BE1E23" fill="#BE1E23" fillOpacity={0.15} strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>

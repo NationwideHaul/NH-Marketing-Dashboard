@@ -1,17 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { format, subDays } from "date-fns";
 import { getCallAnalytics } from "@/lib/api-clients/ringcentral";
-import { listAccounts, getCallSummary, getCalls } from "@/lib/api-clients/callrail";
+import { listAccounts, getCallSummary, getCalls, findCompanyId } from "@/lib/api-clients/callrail";
+import { getAccountCredentials } from "@/lib/account-credentials";
 
-// Combined Call Logs endpoint — merges RingCentral + CallRail
+// Cache company IDs
+const companyIdCache: Record<string, string> = {};
+
+// Combined Call Logs endpoint -- merges RingCentral + CallRail
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const source = searchParams.get("source") || "all"; // all | ringcentral | callrail
   const startDate = searchParams.get("startDate") || format(subDays(new Date(), 30), "yyyy-MM-dd");
   const endDate = searchParams.get("endDate") || format(new Date(), "yyyy-MM-dd");
-  const department = searchParams.get("department") || "Nationwide Haul";
+  const dashboardAccountId = searchParams.get("accountId") || "nationwide-haul";
 
-  const result: any = { platform: "call-logs", status: "live", data: {} }; // eslint-disable-line @typescript-eslint/no-explicit-any
+  // Get company name for this dashboard account
+  const creds = getAccountCredentials(dashboardAccountId);
+  const companyName = creds.callrailCompanyName || "Nationwide Haul";
+
+  const result: any = { platform: "call-logs", status: "live", companyName, data: {} }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   // ===== RINGCENTRAL =====
   if ((source === "all" || source === "ringcentral") && process.env.RINGCENTRAL_CLIENT_ID) {
@@ -26,27 +34,33 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // ===== CALLRAIL =====
+  // ===== CALLRAIL (filtered by company) =====
   if ((source === "all" || source === "callrail") && process.env.CALLRAIL_API_KEY) {
     try {
       const accountsData = await listAccounts();
       const accounts = accountsData.accounts || [];
       if (accounts.length > 0) {
-        const accountId = accounts[0].id;
-        const summary = await getCallSummary(accountId, startDate, endDate);
-        const rawCalls = await getCalls(accountId, startDate, endDate);
+        const crAccountId = accounts[0].id;
 
-        // Enrich with quality filters
+        // Find company ID for this account
+        let companyId = companyIdCache[companyName];
+        if (!companyId) {
+          companyId = await findCompanyId(crAccountId, companyName) || "";
+          if (companyId) companyIdCache[companyName] = companyId;
+        }
+
+        const summary = await getCallSummary(crAccountId, startDate, endDate, companyId || undefined);
+        const rawCalls = await getCalls(crAccountId, startDate, endDate, companyId || undefined);
+
         const calls = rawCalls.calls || [];
         const answeredCalls = calls.filter((c: any) => c.answered); // eslint-disable-line @typescript-eslint/no-explicit-any
         const qualifiedCalls = calls.filter((c: any) => c.answered && c.duration > 30); // eslint-disable-line @typescript-eslint/no-explicit-any
         const missedCalls = calls.filter((c: any) => !c.answered); // eslint-disable-line @typescript-eslint/no-explicit-any
-        const firstTimeCalls = calls.filter((c: any) => c.first_call); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-        // Calls by source (lead attribution)
+        // Calls by source -- use tracker_name (friendly name) instead of phone number
         const bySource: Record<string, { total: number; answered: number; qualified: number; missed: number }> = {};
         calls.forEach((c: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-          const src = c.source || c.tracking_phone_number || "Unknown";
+          const src = c.tracker_name || c.source || c.tracking_phone_number || "Unknown";
           if (!bySource[src]) bySource[src] = { total: 0, answered: 0, qualified: 0, missed: 0 };
           bySource[src].total++;
           if (c.answered) bySource[src].answered++;
@@ -54,7 +68,7 @@ export async function GET(request: NextRequest) {
           if (!c.answered) bySource[src].missed++;
         });
 
-        // Calls by day of week
+        // Calls by day of week (totals for the period, not averages)
         const byDayOfWeek: Record<string, { total: number; firstTime: number; repeat: number }> = {
           Sun: { total: 0, firstTime: 0, repeat: 0 },
           Mon: { total: 0, firstTime: 0, repeat: 0 },
@@ -75,7 +89,7 @@ export async function GET(request: NextRequest) {
           }
         });
 
-        // Calls by hour (heatmap data)
+        // Calls by hour
         const byHour: Record<number, number> = {};
         calls.forEach((c: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
           const hour = new Date(c.created_at || c.start_time).getHours();
@@ -84,6 +98,7 @@ export async function GET(request: NextRequest) {
 
         result.data.callrail = {
           ...summary,
+          companyName,
           qualifiedCalls: qualifiedCalls.length,
           missedCallRate: calls.length > 0 ? Math.round((missedCalls.length / calls.length) * 1000) / 10 : 0,
           bySource: Object.entries(bySource)
@@ -96,7 +111,7 @@ export async function GET(request: NextRequest) {
           recentCalls: calls.slice(0, 20).map((c: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
             caller: c.caller_name || c.caller_number || "Unknown",
             number: c.caller_number,
-            source: c.source || "Unknown",
+            source: c.tracker_name || c.source || "Unknown",
             duration: c.duration || 0,
             answered: c.answered || false,
             firstCall: c.first_call || false,
