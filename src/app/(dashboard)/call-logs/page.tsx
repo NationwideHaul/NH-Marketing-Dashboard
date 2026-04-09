@@ -181,7 +181,7 @@ function AgentCallsTab() {
                     { name: "Outbound", value: totalOutbound, fill: primary },
                   ]}
                   cx="50%" cy="50%" innerRadius="40%" outerRadius="65%" paddingAngle={3} dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }: { name: string; percent?: number }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                 >
                   <Cell fill={positiveColor} />
                   <Cell fill={primary} />
