@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { format, subDays } from "date-fns";
 import { getCallAnalytics } from "@/lib/api-clients/ringcentral";
-import { listAccounts, getCallSummary, getCalls, findCompanyId } from "@/lib/api-clients/callrail";
+import { listAccounts, getCallSummary, getCalls, findCompanyId, getTrackingNumbers } from "@/lib/api-clients/callrail";
 import { getAccountCredentials } from "@/lib/account-credentials";
 
 // Cache company IDs
@@ -49,6 +49,17 @@ export async function GET(request: NextRequest) {
           if (companyId) companyIdCache[companyName] = companyId;
         }
 
+        // Fetch trackers to build phone number -> name lookup
+        const trackersData = await getTrackingNumbers(crAccountId, companyId || undefined);
+        const trackers = trackersData.trackers || [];
+        const trackerNameMap: Record<string, string> = {};
+        trackers.forEach((t: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+          // Map both raw number and formatted number to the tracker name
+          const num = String(t.tracking_phone_number || "").replace(/\D/g, "");
+          if (num) trackerNameMap[num] = t.name;
+          if (t.tracking_phone_number) trackerNameMap[t.tracking_phone_number] = t.name;
+        });
+
         const summary = await getCallSummary(crAccountId, startDate, endDate, companyId || undefined);
         const rawCalls = await getCalls(crAccountId, startDate, endDate, companyId || undefined);
 
@@ -57,10 +68,20 @@ export async function GET(request: NextRequest) {
         const qualifiedCalls = calls.filter((c: any) => c.answered && c.duration > 30); // eslint-disable-line @typescript-eslint/no-explicit-any
         const missedCalls = calls.filter((c: any) => !c.answered); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-        // Calls by source -- use tracker_name (friendly name) instead of phone number
+        // Helper: resolve a tracking phone number to its friendly name
+        function resolveTrackerName(call: any): string { // eslint-disable-line @typescript-eslint/no-explicit-any
+          const rawNum = String(call.tracking_phone_number || "").replace(/\D/g, "");
+          if (trackerNameMap[rawNum]) return trackerNameMap[rawNum];
+          if (call.tracking_phone_number && trackerNameMap[call.tracking_phone_number]) return trackerNameMap[call.tracking_phone_number];
+          if (call.source_name) return call.source_name;
+          if (call.source && !/^\+?\d/.test(call.source)) return call.source; // Only use source if it's not a phone number
+          return call.tracking_phone_number || "Unknown";
+        }
+
+        // Calls by source -- use tracker names
         const bySource: Record<string, { total: number; answered: number; qualified: number; missed: number }> = {};
         calls.forEach((c: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-          const src = c.tracker_name || c.source || c.tracking_phone_number || "Unknown";
+          const src = resolveTrackerName(c);
           if (!bySource[src]) bySource[src] = { total: 0, answered: 0, qualified: 0, missed: 0 };
           bySource[src].total++;
           if (c.answered) bySource[src].answered++;
@@ -111,7 +132,7 @@ export async function GET(request: NextRequest) {
           recentCalls: calls.slice(0, 20).map((c: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
             caller: c.caller_name || c.caller_number || "Unknown",
             number: c.caller_number,
-            source: c.tracker_name || c.source || "Unknown",
+            source: resolveTrackerName(c),
             duration: c.duration || 0,
             answered: c.answered || false,
             firstCall: c.first_call || false,
