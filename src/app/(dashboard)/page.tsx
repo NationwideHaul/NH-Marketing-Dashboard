@@ -81,11 +81,10 @@ function NHTTROverviewHeader() {
     { name: "TruckDown", icon: Layers, calls: 4, color: "#16A34A" },
   ];
 
-  const infoSubmitSources = [
-    { name: "Websites", count: 5 },
-    { name: "Google My Business", count: 4 },
-    { name: "Find Truck Service", count: 2 },
-    { name: "NTTS", count: 1 },
+  // Per-website breakdown (calls + info submits)
+  const websiteBreakdown = [
+    { name: "RV & Bus Repair", website: "nhrvrepair.com", calls: 34, infoSubmits: 7, color: "#BE1E23" },
+    { name: "Truck & Trailer Repair", website: "nhtrucktrailerrepair.com", calls: 25, infoSubmits: 5, color: "#8C0F14" },
   ];
 
   const inventoryPlatformCalls = callSources.filter((s) => ["NTTS", "Find Truck Service", "TruckDown"].includes(s.name));
@@ -167,14 +166,35 @@ function NHTTROverviewHeader() {
         </div>
       </div>
 
-      {/* Info Submit Breakdown */}
+      {/* Per-Website Breakdown */}
       <div className="rounded-xl border border-border bg-card p-5 mb-4">
-        <h3 className="text-sm font-bold text-card-foreground mb-4">Where Info Submits Came From</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {infoSubmitSources.map((src) => (
-            <div key={src.name} className="rounded-lg bg-muted/50 p-3 text-center">
-              <p className="text-2xl font-bold text-card-foreground">{src.count}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">{src.name}</p>
+        <h3 className="text-sm font-bold text-card-foreground mb-4">Breakdown by Website</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {websiteBreakdown.map((site) => (
+            <div key={site.name} className="rounded-lg border border-border p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: site.color }} />
+                <div>
+                  <p className="text-sm font-bold text-card-foreground">{site.name}</p>
+                  <p className="text-[10px] text-muted-foreground">{site.website}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-md bg-muted/50 p-3 text-center">
+                  <div className="flex items-center justify-center gap-1.5 mb-1">
+                    <Phone className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-[10px] text-muted-foreground">Calls</span>
+                  </div>
+                  <p className="text-2xl font-bold text-card-foreground">{site.calls}</p>
+                </div>
+                <div className="rounded-md bg-muted/50 p-3 text-center">
+                  <div className="flex items-center justify-center gap-1.5 mb-1">
+                    <FileText className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-[10px] text-muted-foreground">Info Submits</span>
+                  </div>
+                  <p className="text-2xl font-bold text-card-foreground">{site.infoSubmits}</p>
+                </div>
+              </div>
             </div>
           ))}
         </div>
