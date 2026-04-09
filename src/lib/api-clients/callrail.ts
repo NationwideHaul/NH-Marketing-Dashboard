@@ -20,11 +20,22 @@ export async function listAccounts() {
   return response.json();
 }
 
-// Get calls for an account
+// List companies under an account
+export async function listCompanies(accountId: string) {
+  const response = await fetch(
+    `${CR_BASE_URL}/a/${accountId}/companies.json`,
+    { headers: getHeaders() }
+  );
+  if (!response.ok) throw new Error(`CallRail API error: ${response.status}`);
+  return response.json();
+}
+
+// Get calls for an account, optionally filtered by company ID
 export async function getCalls(
   accountId: string,
   startDate: string, // YYYY-MM-DD
   endDate: string,
+  companyId?: string,
   perPage: number = 250
 ) {
   const params = new URLSearchParams({
@@ -32,6 +43,7 @@ export async function getCalls(
     end_date: endDate,
     per_page: String(perPage),
   });
+  if (companyId) params.set("company_id", companyId);
 
   const response = await fetch(
     `${CR_BASE_URL}/a/${accountId}/calls.json?${params}`,
@@ -45,9 +57,10 @@ export async function getCalls(
 export async function getCallSummary(
   accountId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  companyId?: string
 ) {
-  const data = await getCalls(accountId, startDate, endDate);
+  const data = await getCalls(accountId, startDate, endDate, companyId);
   const calls = data.calls || [];
 
   const totalCalls = calls.length;
@@ -66,6 +79,13 @@ export async function getCallSummary(
     sources[src] = (sources[src] || 0) + 1;
   });
 
+  // Tracker name breakdown (for inventory platforms -- which tracking number got the call)
+  const trackerBreakdown: Record<string, number> = {};
+  calls.forEach((c: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+    const tracker = c.tracker_name || c.tracking_phone_number || "Unknown";
+    trackerBreakdown[tracker] = (trackerBreakdown[tracker] || 0) + 1;
+  });
+
   return {
     totalCalls,
     answered,
@@ -76,14 +96,28 @@ export async function getCallSummary(
     sourceBreakdown: Object.entries(sources)
       .map(([source, count]) => ({ source, count }))
       .sort((a, b) => b.count - a.count),
+    trackerBreakdown: Object.entries(trackerBreakdown)
+      .map(([tracker, count]) => ({ tracker, count }))
+      .sort((a, b) => b.count - a.count),
     calls, // raw data for tables
   };
 }
 
+// Find company ID by name
+export async function findCompanyId(accountId: string, companyName: string): Promise<string | null> {
+  const data = await listCompanies(accountId);
+  const companies = data.companies || [];
+  const found = companies.find((c: any) => // eslint-disable-line @typescript-eslint/no-explicit-any
+    c.name === companyName || c.name.includes(companyName)
+  );
+  return found?.id || null;
+}
+
 // Get tracking numbers
-export async function getTrackingNumbers(accountId: string) {
+export async function getTrackingNumbers(accountId: string, companyId?: string) {
+  const params = companyId ? `?company_id=${companyId}` : "";
   const response = await fetch(
-    `${CR_BASE_URL}/a/${accountId}/trackers.json`,
+    `${CR_BASE_URL}/a/${accountId}/trackers.json${params}`,
     { headers: getHeaders() }
   );
   if (!response.ok) throw new Error(`CallRail API error: ${response.status}`);
