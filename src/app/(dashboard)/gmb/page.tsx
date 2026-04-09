@@ -1,32 +1,31 @@
 "use client";
 
-import { useState } from "react";
 import { MapPin, CheckCircle2, AlertCircle } from "lucide-react";
 import { WidgetPage } from "@/components/widgets/widget-page";
 import { useAccount } from "@/context/account-context";
 import { cn } from "@/lib/utils";
 
 function GMBLocationCards() {
-  const { currentAccount } = useAccount();
-  const locations = currentAccount.gmbLocations;
-  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
+  const { currentAccount, activeSubService } = useAccount();
+  const allLocations = currentAccount.gmbLocations;
 
-  if (!locations?.length) return null;
+  if (!allLocations?.length) return null;
+
+  // Filter by active sub-service if the account has sub-services
+  const locations = activeSubService
+    ? allLocations.filter((loc) => loc.subServiceId === activeSubService)
+    : allLocations;
+
+  if (locations.length === 0) return null;
 
   return (
     <div className="mb-4">
-      {/* Location Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+      {/* Location Card(s) */}
+      <div className={cn("grid gap-3 mb-4", locations.length > 1 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 max-w-lg")}>
         {locations.map((loc) => (
-          <button
+          <div
             key={loc.id}
-            onClick={() => setSelectedLocation(selectedLocation === loc.id ? null : loc.id)}
-            className={cn(
-              "rounded-lg border p-4 text-left transition-all",
-              selectedLocation === loc.id
-                ? "border-primary ring-2 ring-primary/20 bg-primary/5"
-                : "border-border bg-card hover:border-primary/30"
-            )}
+            className="rounded-lg border border-border bg-card p-4"
           >
             <div className="flex items-start justify-between mb-2">
               <div className="flex items-center gap-2">
@@ -49,11 +48,11 @@ function GMBLocationCards() {
             <div className="text-[10px] text-muted-foreground">
               Location ID: {loc.id}
             </div>
-          </button>
+          </div>
         ))}
       </div>
 
-      {/* Verification Warning */}
+      {/* Verification Warning -- only show if current filtered locations have unverified ones */}
       {locations.some((loc) => !loc.verified) && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-4">
           <div className="flex items-start gap-2">
@@ -61,7 +60,7 @@ function GMBLocationCards() {
             <div>
               <p className="text-xs font-medium text-amber-800">Location Verification Required</p>
               <p className="text-[11px] text-amber-700 mt-0.5">
-                &quot;RV &amp; Bus Repair &amp; Service&quot; needs to be verified in Google Business Profile before analytics data will appear.
+                This location needs to be verified in Google Business Profile before analytics data will appear.
                 Visit the Google Business Profile dashboard to complete verification.
               </p>
             </div>
@@ -73,9 +72,18 @@ function GMBLocationCards() {
 }
 
 export default function GMBPage() {
-  const { currentAccount } = useAccount();
-  const hasLocations = (currentAccount.gmbLocations?.length || 0) > 0;
-  const locationCount = currentAccount.gmbLocations?.length || 0;
+  const { currentAccount, activeSubService } = useAccount();
+  const allLocations = currentAccount.gmbLocations;
+  const locations = activeSubService
+    ? allLocations?.filter((loc) => loc.subServiceId === activeSubService)
+    : allLocations;
+  const hasLocations = (locations?.length || 0) > 0;
+  const locationCount = locations?.length || 0;
+
+  // Get active sub-service name for title
+  const activeSub = activeSubService
+    ? currentAccount.subServices?.find((s) => s.id === activeSubService)
+    : null;
 
   return (
     <div>
@@ -83,7 +91,7 @@ export default function GMBPage() {
         <div className="mb-4">
           <h2 className="text-lg font-bold text-foreground">Google My Business</h2>
           <p className="text-sm text-muted-foreground">
-            {locationCount} location{locationCount > 1 ? "s" : ""} -- local presence, profile views, calls, directions, and reviews
+            {activeSub ? `${activeSub.name} -- ` : ""}{locationCount} location{locationCount > 1 ? "s" : ""} -- local presence, profile views, calls, directions, and reviews
           </p>
         </div>
       )}

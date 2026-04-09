@@ -3,6 +3,7 @@ export interface GMBLocationInfo {
   name: string;
   address: string;
   verified: boolean;
+  subServiceId?: string; // links to subServices[].id for filtering
 }
 
 export interface SubAccount {
@@ -111,12 +112,14 @@ export const accounts: SubAccount[] = [
         name: "Nationwide Haul - RV & Bus Repair & Service",
         address: "5021 Frontage Rd N, Suite RV, Lakeland, FL 33810",
         verified: false,
+        subServiceId: "rv",
       },
       {
         id: "16514751471730111176",
         name: "Nationwide Haul - Truck & Trailer Repair",
         address: "5021 Frontage Rd N, Suite Shop, Lakeland, FL 33810",
         verified: true,
+        subServiceId: "ttr",
       },
     ],
   },
