@@ -98,36 +98,58 @@ const nhPlatforms: PlatformData[] = [
 ];
 
 // NHTTR — service/repair listing platforms (annual billing, linked to CallRail "NH Repair Shops")
+// monthlyData.calls will come from CallRail — placeholder data for now
 const nhttrPlatforms: PlatformData[] = [
   {
     name: "NTTS",
     fullName: "NTTS Breakdown Service",
     color: "#BE1E23",
-    pricePerMonth: Math.round(100 / 12),
+    pricePerMonth: 0,
     billingCycle: "annual",
     annualCost: 100,
     renewalDate: "2026-04-02",
-    monthlyData: [], // Will be populated from CallRail
+    monthlyData: [
+      { month: "Oct 25", calls: 12, infoSubmits: 0, leads: 12, price: 0 },
+      { month: "Nov 25", calls: 8, infoSubmits: 0, leads: 8, price: 0 },
+      { month: "Dec 25", calls: 15, infoSubmits: 0, leads: 15, price: 0 },
+      { month: "Jan 26", calls: 10, infoSubmits: 0, leads: 10, price: 0 },
+      { month: "Feb 26", calls: 14, infoSubmits: 0, leads: 14, price: 0 },
+      { month: "Mar 26", calls: 18, infoSubmits: 0, leads: 18, price: 0 },
+    ],
   },
   {
     name: "Find Truck Service",
     fullName: "Find Truck Service",
     color: "#2563EB",
-    pricePerMonth: Math.round(996 / 12),
+    pricePerMonth: 0,
     billingCycle: "annual",
     annualCost: 996,
     renewalDate: "2026-06-28",
-    monthlyData: [], // Will be populated from CallRail
+    monthlyData: [
+      { month: "Oct 25", calls: 22, infoSubmits: 0, leads: 22, price: 0 },
+      { month: "Nov 25", calls: 17, infoSubmits: 0, leads: 17, price: 0 },
+      { month: "Dec 25", calls: 25, infoSubmits: 0, leads: 25, price: 0 },
+      { month: "Jan 26", calls: 19, infoSubmits: 0, leads: 19, price: 0 },
+      { month: "Feb 26", calls: 28, infoSubmits: 0, leads: 28, price: 0 },
+      { month: "Mar 26", calls: 31, infoSubmits: 0, leads: 31, price: 0 },
+    ],
   },
   {
     name: "TruckDown",
     fullName: "TruckDown",
     color: "#16A34A",
-    pricePerMonth: Math.round(430 / 12),
+    pricePerMonth: 0,
     billingCycle: "annual",
     annualCost: 430,
     renewalDate: "2026-07-14",
-    monthlyData: [], // Will be populated from CallRail
+    monthlyData: [
+      { month: "Oct 25", calls: 9, infoSubmits: 0, leads: 9, price: 0 },
+      { month: "Nov 25", calls: 6, infoSubmits: 0, leads: 6, price: 0 },
+      { month: "Dec 25", calls: 11, infoSubmits: 0, leads: 11, price: 0 },
+      { month: "Jan 26", calls: 7, infoSubmits: 0, leads: 7, price: 0 },
+      { month: "Feb 26", calls: 13, infoSubmits: 0, leads: 13, price: 0 },
+      { month: "Mar 26", calls: 10, infoSubmits: 0, leads: 10, price: 0 },
+    ],
   },
 ];
 
