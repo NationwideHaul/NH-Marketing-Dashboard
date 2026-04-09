@@ -1,11 +1,13 @@
 "use client";
 
 import { useWidgetMetric } from "@/hooks/use-widget-data";
+import { useAccount } from "@/context/account-context";
 import { formatNumber, formatCurrency, formatPercent } from "@/lib/utils";
 import type { WidgetConfig } from "@/types/widget";
 
 export function GoalWidget({ config }: { config: WidgetConfig }) {
   const metric = useWidgetMetric(config);
+  const { currentAccount } = useAccount();
   const current = metric?.value || 0;
   const goal = config.goalValue || 1;
   const pct = Math.min(100, Math.round((current / goal) * 100));
@@ -25,7 +27,7 @@ export function GoalWidget({ config }: { config: WidgetConfig }) {
           className="h-full rounded-full transition-all"
           style={{
             width: `${pct}%`,
-            backgroundColor: pct >= 90 ? "#EF4444" : pct >= 70 ? "#D97706" : "#16A34A",
+            backgroundColor: pct >= 90 ? "#EF4444" : pct >= 70 ? "#D97706" : currentAccount.positiveColor,
           }}
         />
       </div>

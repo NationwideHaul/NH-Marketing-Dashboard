@@ -3,23 +3,35 @@ import type { WidgetType, DataSourceOption } from "@/types/widget";
 // Chart types available in the picker
 export const chartTypes: { key: WidgetType; label: string; icon: string }[] = [
   { key: "stat", label: "Stat", icon: "#" },
-  { key: "line-chart", label: "Line", icon: "📈" },
-  { key: "area-chart", label: "Area", icon: "📊" },
-  { key: "bar-chart", label: "Bar", icon: "▊" },
-  { key: "pie-chart", label: "Donut", icon: "◕" },
-  { key: "table", label: "Table", icon: "▤" },
-  { key: "goal-tracker", label: "Goal", icon: "◎" },
+  { key: "interactive-stat", label: "Interactive", icon: "#" },
+  { key: "manual-stat", label: "Manual", icon: "#" },
+  { key: "line-chart", label: "Line", icon: "~" },
+  { key: "area-chart", label: "Area", icon: "~" },
+  { key: "bar-chart", label: "Bar", icon: "|" },
+  { key: "pie-chart", label: "Donut", icon: "o" },
+  { key: "table", label: "Table", icon: "=" },
+  { key: "goal-tracker", label: "Goal", icon: "o" },
+  { key: "section-header", label: "Section", icon: "-" },
+  { key: "top-content", label: "Top Content", icon: "T" },
+  { key: "recent-content", label: "Recent", icon: "R" },
+  { key: "active-ads", label: "Active Ads", icon: "A" },
 ];
 
 // Default sizes for each widget type (12-col grid)
 export const defaultWidgetSizes: Record<WidgetType, { w: number; h: number; minW: number; minH: number }> = {
   "stat": { w: 3, h: 2, minW: 2, minH: 2 },
+  "interactive-stat": { w: 3, h: 2, minW: 2, minH: 2 },
+  "manual-stat": { w: 3, h: 2, minW: 2, minH: 2 },
   "line-chart": { w: 6, h: 5, minW: 3, minH: 3 },
   "bar-chart": { w: 6, h: 5, minW: 3, minH: 3 },
   "area-chart": { w: 6, h: 5, minW: 3, minH: 3 },
   "pie-chart": { w: 4, h: 5, minW: 3, minH: 3 },
   "table": { w: 8, h: 6, minW: 4, minH: 4 },
   "goal-tracker": { w: 3, h: 2, minW: 2, minH: 2 },
+  "section-header": { w: 12, h: 1, minW: 6, minH: 1 },
+  "top-content": { w: 6, h: 6, minW: 4, minH: 4 },
+  "recent-content": { w: 6, h: 6, minW: 4, minH: 4 },
+  "active-ads": { w: 12, h: 8, minW: 6, minH: 5 },
 };
 
 // All data sources with their FULL available metrics
@@ -27,7 +39,7 @@ export const dataSources: DataSourceOption[] = [
   {
     key: "google-analytics",
     label: "Google Analytics 4",
-    icon: "📊",
+    icon: "GA",
     metrics: [
       { key: "sessions", label: "Sessions", format: "number", category: "Traffic" },
       { key: "users", label: "Users", format: "number", category: "Traffic" },
@@ -42,7 +54,7 @@ export const dataSources: DataSourceOption[] = [
   {
     key: "google-ads",
     label: "Google Ads",
-    icon: "💰",
+    icon: "Ads",
     metrics: [
       { key: "spend", label: "Cost (Spend)", format: "currency", category: "Spend" },
       { key: "clicks", label: "Clicks", format: "number", category: "Traffic" },
@@ -57,7 +69,7 @@ export const dataSources: DataSourceOption[] = [
   {
     key: "meta-ads",
     label: "Meta Ads",
-    icon: "📢",
+    icon: "Meta",
     metrics: [
       { key: "spend", label: "Amount Spent", format: "currency", category: "Spend" },
       { key: "impressions", label: "Impressions", format: "number", category: "Reach" },
@@ -73,7 +85,7 @@ export const dataSources: DataSourceOption[] = [
   {
     key: "youtube",
     label: "YouTube",
-    icon: "▶️",
+    icon: "YT",
     metrics: [
       { key: "views", label: "Views", format: "number", category: "Traffic" },
       { key: "subscribers", label: "Total Subscribers", format: "number", category: "Audience" },
@@ -90,7 +102,7 @@ export const dataSources: DataSourceOption[] = [
   {
     key: "facebook",
     label: "Facebook",
-    icon: "👍",
+    icon: "FB",
     metrics: [
       { key: "followers", label: "Page Followers", format: "number", category: "Audience" },
       { key: "pageViews", label: "Page Views", format: "number", category: "Traffic" },
@@ -103,7 +115,7 @@ export const dataSources: DataSourceOption[] = [
   {
     key: "instagram",
     label: "Instagram",
-    icon: "📷",
+    icon: "IG",
     metrics: [
       { key: "followers", label: "Followers", format: "number", category: "Audience" },
       { key: "reach", label: "Reach", format: "number", category: "Reach" },
@@ -116,7 +128,7 @@ export const dataSources: DataSourceOption[] = [
   {
     key: "callrail",
     label: "CallRail",
-    icon: "📞",
+    icon: "CR",
     metrics: [
       { key: "totalCalls", label: "Total Calls", format: "number", category: "Calls" },
       { key: "answered", label: "Answered Calls", format: "number", category: "Calls" },
@@ -129,7 +141,7 @@ export const dataSources: DataSourceOption[] = [
   {
     key: "ringcentral",
     label: "RingCentral",
-    icon: "☎️",
+    icon: "RC",
     metrics: [
       { key: "totalCalls", label: "Total Calls", format: "number", category: "Calls" },
       { key: "answered", label: "Answered", format: "number", category: "Calls" },
@@ -141,7 +153,7 @@ export const dataSources: DataSourceOption[] = [
   {
     key: "email-marketing",
     label: "Email Marketing (GHL)",
-    icon: "✉️",
+    icon: "GHL",
     metrics: [
       { key: "emailsSent", label: "Emails Sent", format: "number", category: "Activity" },
       { key: "openRate", label: "Open Rate", format: "percent", category: "Performance" },
@@ -154,7 +166,7 @@ export const dataSources: DataSourceOption[] = [
   {
     key: "gmb",
     label: "Google My Business",
-    icon: "📍",
+    icon: "GMB",
     metrics: [
       { key: "profileViews", label: "Profile Views", format: "number", category: "Traffic" },
       { key: "searchViews", label: "Search Views", format: "number", category: "Traffic" },
@@ -167,12 +179,39 @@ export const dataSources: DataSourceOption[] = [
   {
     key: "linkedin",
     label: "LinkedIn",
-    icon: "💼",
+    icon: "LI",
     metrics: [
       { key: "impressions", label: "Impressions", format: "number", category: "Reach" },
       { key: "clicks", label: "Clicks", format: "number", category: "Traffic" },
       { key: "followers", label: "Followers", format: "number", category: "Audience" },
       { key: "ctr", label: "CTR", format: "percent", category: "Performance" },
+    ],
+  },
+  {
+    key: "overview",
+    label: "Overview / ROI",
+    icon: "ROI",
+    metrics: [
+      { key: "revenue", label: "Revenue", format: "currency", category: "Sales" },
+      { key: "closeRate", label: "Close Rate", format: "percent", category: "Sales" },
+      { key: "aov", label: "Average Order Value", format: "currency", category: "Sales" },
+      { key: "totalSpend", label: "Total Spend", format: "currency", category: "Spend" },
+      { key: "adSpend", label: "Ad Spend", format: "currency", category: "Spend" },
+      { key: "roas", label: "ROAS", format: "number", category: "Profitability" },
+      { key: "mer", label: "MER", format: "number", category: "Profitability" },
+      { key: "roi", label: "ROI", format: "number", category: "Profitability" },
+      { key: "cac", label: "CAC", format: "currency", category: "Efficiency" },
+      { key: "ltv", label: "LTV", format: "currency", category: "Efficiency" },
+      { key: "newCustomers", label: "New Customers", format: "number", category: "Sales" },
+      { key: "totalLeads", label: "Total Leads", format: "number", category: "Funnel" },
+      { key: "mql", label: "MQLs", format: "number", category: "Funnel" },
+      { key: "sql", label: "SQLs", format: "number", category: "Funnel" },
+      { key: "closedDeals", label: "Closed Deals", format: "number", category: "Funnel" },
+      { key: "conversionRate", label: "Conversion Rate", format: "percent", category: "Performance" },
+      { key: "profitMargin", label: "Profit Margin", format: "percent", category: "Profitability" },
+      { key: "trafficGrowth", label: "Traffic Growth", format: "percent", category: "Growth" },
+      { key: "revenueGrowth", label: "Revenue Growth", format: "percent", category: "Growth" },
+      { key: "costEfficiency", label: "Cost Efficiency", format: "percent", category: "Efficiency" },
     ],
   },
 ];

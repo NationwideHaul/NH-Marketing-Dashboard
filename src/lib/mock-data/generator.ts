@@ -94,20 +94,6 @@ export function generateTimeSeries(
   return points;
 }
 
-// Aggregate daily data to monthly buckets
-export function aggregateMonthly(points: TimeSeriesPoint[]): TimeSeriesPoint[] {
-  const monthly: Record<string, number[]> = {};
-  for (const p of points) {
-    const month = p.date.substring(0, 7); // YYYY-MM
-    if (!monthly[month]) monthly[month] = [];
-    monthly[month].push(p.value);
-  }
-  return Object.entries(monthly).map(([month, values]) => ({
-    date: month,
-    value: Math.round(values.reduce((a, b) => a + b, 0)),
-  }));
-}
-
 // Aggregate to weekly
 export function aggregateWeekly(points: TimeSeriesPoint[]): TimeSeriesPoint[] {
   const weekly: TimeSeriesPoint[] = [];
@@ -117,4 +103,34 @@ export function aggregateWeekly(points: TimeSeriesPoint[]): TimeSeriesPoint[] {
     weekly.push({ date: chunk[0].date, value: Math.round(sum) });
   }
   return weekly;
+}
+
+// Aggregate to monthly (sum)
+export function aggregateMonthly(points: TimeSeriesPoint[]): TimeSeriesPoint[] {
+  const byMonth: Record<string, { sum: number; date: string }> = {};
+  for (const p of points) {
+    const s = String(p.date);
+    // Support YYYYMMDD or YYYY-MM-DD formats
+    const month = s.length === 8 ? s.slice(0, 6) : s.slice(0, 7).replace("-", "");
+    if (!byMonth[month]) byMonth[month] = { sum: 0, date: p.date };
+    byMonth[month].sum += p.value;
+  }
+  return Object.values(byMonth)
+    .map((m) => ({ date: m.date, value: Math.round(m.sum) }))
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
+// Aggregate to monthly (average — use for rates, ratios, percentages)
+export function aggregateMonthlyAvg(points: TimeSeriesPoint[]): TimeSeriesPoint[] {
+  const byMonth: Record<string, { sum: number; count: number; date: string }> = {};
+  for (const p of points) {
+    const s = String(p.date);
+    const month = s.length === 8 ? s.slice(0, 6) : s.slice(0, 7).replace("-", "");
+    if (!byMonth[month]) byMonth[month] = { sum: 0, count: 0, date: p.date };
+    byMonth[month].sum += p.value;
+    byMonth[month].count++;
+  }
+  return Object.values(byMonth)
+    .map((m) => ({ date: m.date, value: Math.round((m.sum / m.count) * 100) / 100 }))
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Wallet, Pencil, Check } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { Wallet, Pencil, Check, Plus, Trash2 } from "lucide-react";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend,
@@ -9,65 +9,106 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { DataSourceBadge } from "@/components/layout/data-source-badge";
 import { externalLinks } from "@/lib/external-links";
-
-const COLORS = ["#BE1E23", "#8C0F14", "#2563EB", "#16A34A", "#D97706", "#7C3AED", "#DB2777", "#0891B2"];
-
-const STORAGE_KEY = "nh-budget-allocations-v1";
+import { useAccount } from "@/context/account-context";
 
 interface BudgetRow {
   platform: string;
   budget: number;
-  spent: number; // Real spend from APIs or manual
+  spent: number;
   category: "advertising" | "platform" | "tools";
 }
 
-// Default budgets — user can edit these
-const defaultBudgets: BudgetRow[] = [
-  { platform: "Google Ads", budget: 5000, spent: 0, category: "advertising" },
-  { platform: "Meta Ads", budget: 7500, spent: 0, category: "advertising" },
-  { platform: "TruckPaper", budget: 6800, spent: 6800, category: "platform" },
-  { platform: "My Little Salesman", budget: 895, spent: 895, category: "platform" },
-  { platform: "Commercial Truck Trader", budget: 1200, spent: 1200, category: "platform" },
-  { platform: "Cherry Trader", budget: 500, spent: 500, category: "platform" },
-  { platform: "NH Website", budget: 195, spent: 195, category: "platform" },
-  { platform: "Go High Level", budget: 297, spent: 297, category: "tools" },
-  { platform: "RingCentral", budget: 450, spent: 450, category: "tools" },
-  { platform: "CallRail", budget: 145, spent: 145, category: "tools" },
-];
+// Per-account default budgets
+const accountBudgets: Record<string, BudgetRow[]> = {
+  "nationwide-haul": [
+    { platform: "Google Ads", budget: 5000, spent: 0, category: "advertising" },
+    { platform: "Meta Ads", budget: 7500, spent: 0, category: "advertising" },
+    { platform: "TruckPaper", budget: 6800, spent: 6800, category: "platform" },
+    { platform: "My Little Salesman", budget: 895, spent: 895, category: "platform" },
+    { platform: "Commercial Truck Trader", budget: 1200, spent: 1200, category: "platform" },
+    { platform: "Cherry Trader", budget: 500, spent: 500, category: "platform" },
+    { platform: "NH Website", budget: 195, spent: 195, category: "platform" },
+    { platform: "Go High Level", budget: 297, spent: 297, category: "tools" },
+  ],
+  "nfi-truck-sales": [
+    { platform: "Google Ads", budget: 4000, spent: 0, category: "advertising" },
+    { platform: "TruckPaper", budget: 5200, spent: 5200, category: "platform" },
+    { platform: "My Little Salesman", budget: 895, spent: 895, category: "platform" },
+    { platform: "Commercial Truck Trader", budget: 950, spent: 950, category: "platform" },
+    { platform: "Cherry Trader", budget: 500, spent: 500, category: "platform" },
+    { platform: "NFI Website", budget: 150, spent: 150, category: "platform" },
+    { platform: "Go High Level", budget: 297, spent: 297, category: "tools" },
+    { platform: "CallRail", budget: 145, spent: 145, category: "tools" },
+  ],
+  nhttr: [
+    { platform: "Google Ads (RV Repair)", budget: 2500, spent: 0, category: "advertising" },
+    { platform: "Google Ads (TTR)", budget: 2500, spent: 0, category: "advertising" },
+    { platform: "NTTS Listing", budget: 350, spent: 350, category: "platform" },
+    { platform: "Find Truck Service", budget: 295, spent: 295, category: "platform" },
+    { platform: "TruckDown", budget: 195, spent: 195, category: "platform" },
+    { platform: "Go High Level", budget: 297, spent: 297, category: "tools" },
+    { platform: "CallRail", budget: 145, spent: 145, category: "tools" },
+  ],
+  "road-ready": [
+    { platform: "Google Ads", budget: 3000, spent: 0, category: "advertising" },
+    { platform: "Meta Ads", budget: 2000, spent: 0, category: "advertising" },
+    { platform: "Website Hosting", budget: 99, spent: 99, category: "platform" },
+    { platform: "Go High Level", budget: 297, spent: 297, category: "tools" },
+    { platform: "Lead Gen Software", budget: 199, spent: 199, category: "tools" },
+  ],
+};
 
-function loadBudgets(): BudgetRow[] {
-  if (typeof window === "undefined") return defaultBudgets;
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) {
-    try { return JSON.parse(saved); } catch { return defaultBudgets; }
-  }
-  return defaultBudgets;
+function getStorageKey(accountId: string) {
+  return `nh-budget-${accountId}`;
 }
 
-function saveBudgets(budgets: BudgetRow[]) {
+function loadBudgets(accountId: string): BudgetRow[] {
+  if (typeof window === "undefined") return accountBudgets[accountId] || [];
+  const saved = localStorage.getItem(getStorageKey(accountId));
+  if (saved) {
+    try { return JSON.parse(saved); } catch { /* fall through */ }
+  }
+  return accountBudgets[accountId] || [];
+}
+
+function saveBudgets(accountId: string, budgets: BudgetRow[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(budgets));
+  localStorage.setItem(getStorageKey(accountId), JSON.stringify(budgets));
 }
 
 export default function BudgetPage() {
-  const [budgets, setBudgets] = useState<BudgetRow[]>(defaultBudgets);
+  const { currentAccount } = useAccount();
+  const COLORS = currentAccount.chartPalette;
+  const positiveColor = currentAccount.positiveColor;
+  const primary = currentAccount.colors.primary;
+  const [budgets, setBudgets] = useState<BudgetRow[]>([]);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editBudget, setEditBudget] = useState<string>("");
   const [editSpent, setEditSpent] = useState<string>("");
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    setBudgets(loadBudgets());
-    setLoaded(true);
-  }, []);
+  // Adding new row
+  const [showAdd, setShowAdd] = useState(false);
+  const [newPlatform, setNewPlatform] = useState("");
+  const [newBudget, setNewBudget] = useState("");
+  const [newSpent, setNewSpent] = useState("");
+  const [newCategory, setNewCategory] = useState<"advertising" | "platform" | "tools">("advertising");
 
+  // Load budgets when account changes
   useEffect(() => {
-    if (loaded) saveBudgets(budgets);
-  }, [budgets, loaded]);
+    setBudgets(loadBudgets(currentAccount.id));
+    setLoaded(true);
+    setEditingIdx(null);
+    setShowAdd(false);
+  }, [currentAccount.id]);
+
+  // Persist
+  useEffect(() => {
+    if (loaded) saveBudgets(currentAccount.id, budgets);
+  }, [budgets, loaded, currentAccount.id]);
 
   const totalBudget = budgets.reduce((s, b) => s + b.budget, 0);
   const totalSpent = budgets.reduce((s, b) => s + b.spent, 0);
-  const totalRemaining = totalBudget - totalSpent;
 
   const adSpend = budgets.filter((b) => b.category === "advertising").reduce((s, b) => s + b.spent, 0);
   const platformSpend = budgets.filter((b) => b.category === "platform").reduce((s, b) => s + b.spent, 0);
@@ -99,6 +140,34 @@ export default function BudgetPage() {
     setEditingIdx(null);
   };
 
+  const deleteRow = (idx: number) => {
+    setBudgets((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const addRow = () => {
+    if (!newPlatform.trim()) return;
+    setBudgets((prev) => [
+      ...prev,
+      {
+        platform: newPlatform.trim(),
+        budget: parseFloat(newBudget) || 0,
+        spent: parseFloat(newSpent) || 0,
+        category: newCategory,
+      },
+    ]);
+    setNewPlatform("");
+    setNewBudget("");
+    setNewSpent("");
+    setNewCategory("advertising");
+    setShowAdd(false);
+  };
+
+  const resetToDefaults = () => {
+    const defaults = accountBudgets[currentAccount.id] || [];
+    setBudgets(defaults);
+    localStorage.removeItem(getStorageKey(currentAccount.id));
+  };
+
   if (!loaded) return null;
 
   return (
@@ -107,17 +176,13 @@ export default function BudgetPage() {
         <Wallet className="h-5 w-5 text-primary" />
         <div>
           <h2 className="text-lg font-bold text-foreground">Budget Overview</h2>
-          <p className="text-sm text-muted-foreground">Monthly spend tracking — click the pencil to edit any row</p>
+          <p className="text-sm text-muted-foreground">Monthly advertising spend tracking &mdash; {currentAccount.name}</p>
           <DataSourceBadge sources={externalLinks["/budget"] || []} />
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-xs text-muted-foreground">Total Budget</p>
-          <p className="text-xl font-bold text-card-foreground">{formatCurrency(totalBudget)}</p>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-xs text-muted-foreground">Total Spent</p>
           <p className="text-xl font-bold text-primary">{formatCurrency(totalSpent)}</p>
@@ -128,12 +193,8 @@ export default function BudgetPage() {
           <p className="text-xl font-bold text-red-600">{formatCurrency(adSpend)}</p>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-xs text-muted-foreground">Platforms</p>
-          <p className="text-xl font-bold text-blue-600">{formatCurrency(platformSpend)}</p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-xs text-muted-foreground">Remaining</p>
-          <p className={`text-xl font-bold ${totalRemaining >= 0 ? "text-green-600" : "text-red-500"}`}>{formatCurrency(totalRemaining)}</p>
+          <p className="text-xs text-muted-foreground">Platforms & Tools</p>
+          <p className="text-xl font-bold" style={{ color: COLORS[2] }}>{formatCurrency(platformSpend + toolsSpend)}</p>
         </div>
       </div>
 
@@ -162,7 +223,7 @@ export default function BudgetPage() {
         </div>
 
         <div className="rounded-lg border border-border bg-card p-4">
-          <h3 className="text-sm font-semibold text-card-foreground mb-3">Budget vs Spent</h3>
+          <h3 className="text-sm font-semibold text-card-foreground mb-3">Spend by Platform</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={barData} layout="vertical">
@@ -172,7 +233,7 @@ export default function BudgetPage() {
                 <Tooltip formatter={(v) => formatCurrency(Number(v))} />
                 <Legend />
                 <Bar dataKey="budget" name="Budget" fill="#E5E5E5" radius={[0, 2, 2, 0]} />
-                <Bar dataKey="spent" name="Spent" fill="#BE1E23" radius={[0, 2, 2, 0]} />
+                <Bar dataKey="spent" name="Spent" fill={primary} radius={[0, 2, 2, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -181,8 +242,24 @@ export default function BudgetPage() {
 
       {/* Editable Table */}
       <div className="rounded-lg border border-border bg-card overflow-hidden">
-        <div className="px-4 py-3 border-b border-border bg-muted/30">
-          <h3 className="text-sm font-semibold text-card-foreground">Budget Breakdown — click ✏️ to edit</h3>
+        <div className="px-4 py-3 border-b border-border bg-muted/30 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-card-foreground">Advertising Budget Breakdown</h3>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={resetToDefaults}
+              className="text-[10px] px-2 py-1 rounded border border-border text-muted-foreground hover:bg-muted transition-colors"
+            >
+              Reset to defaults
+            </button>
+            <button
+              onClick={() => setShowAdd(!showAdd)}
+              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded text-white transition-colors"
+              style={{ backgroundColor: primary }}
+            >
+              <Plus className="h-3 w-3" />
+              Add Row
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -194,17 +271,68 @@ export default function BudgetPage() {
                 <th className="px-4 py-2 text-right font-medium text-muted-foreground">Spent</th>
                 <th className="px-4 py-2 text-right font-medium text-muted-foreground">Remaining</th>
                 <th className="px-4 py-2 text-right font-medium text-muted-foreground">Pacing</th>
-                <th className="px-4 py-2 text-center font-medium text-muted-foreground w-10"></th>
+                <th className="px-4 py-2 text-center font-medium text-muted-foreground w-16"></th>
               </tr>
             </thead>
             <tbody>
+              {/* Add new row form */}
+              {showAdd && (
+                <tr className="border-b border-border bg-primary/5">
+                  <td className="px-4 py-2">
+                    <input
+                      type="text"
+                      value={newPlatform}
+                      onChange={(e) => setNewPlatform(e.target.value)}
+                      placeholder="Platform name"
+                      className="w-full px-2 py-1 text-xs border border-primary/30 rounded"
+                      autoFocus
+                    />
+                  </td>
+                  <td className="px-4 py-2">
+                    <select
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value as "advertising" | "platform" | "tools")}
+                      className="text-[10px] px-1.5 py-1 border border-primary/30 rounded"
+                    >
+                      <option value="advertising">advertising</option>
+                      <option value="platform">platform</option>
+                      <option value="tools">tools</option>
+                    </select>
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <input
+                      type="number"
+                      value={newBudget}
+                      onChange={(e) => setNewBudget(e.target.value)}
+                      placeholder="0"
+                      className="w-20 px-2 py-1 text-xs border border-primary/30 rounded text-right"
+                    />
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <input
+                      type="number"
+                      value={newSpent}
+                      onChange={(e) => setNewSpent(e.target.value)}
+                      placeholder="0"
+                      className="w-20 px-2 py-1 text-xs border border-primary/30 rounded text-right"
+                    />
+                  </td>
+                  <td className="px-4 py-2 text-right text-muted-foreground text-xs">—</td>
+                  <td className="px-4 py-2 text-right text-muted-foreground text-xs">—</td>
+                  <td className="px-4 py-2 text-center">
+                    <button onClick={addRow} className="p-1 rounded hover:bg-muted">
+                      <Check className="h-3.5 w-3.5 text-primary" />
+                    </button>
+                  </td>
+                </tr>
+              )}
               {budgets.map((b, i) => {
                 const remaining = b.budget - b.spent;
                 const pacing = b.budget > 0 ? Math.round((b.spent / b.budget) * 100) : 0;
                 const isEditing = editingIdx === i;
 
                 return (
-                  <tr key={b.platform} className="border-b border-border last:border-0">
+                  <tr key={`${b.platform}-${i}`} className="border-b border-border last:border-0">
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
@@ -214,7 +342,7 @@ export default function BudgetPage() {
                     <td className="px-4 py-2.5">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
                         b.category === "advertising" ? "bg-red-100 text-red-700" :
-                        b.category === "platform" ? "bg-blue-100 text-blue-700" :
+                        b.category === "platform" ? "bg-orange-100 text-orange-700" :
                         "bg-gray-100 text-gray-600"
                       }`}>{b.category}</span>
                     </td>
@@ -230,7 +358,7 @@ export default function BudgetPage() {
                           className="w-24 px-2 py-1 text-xs border border-primary rounded text-right" />
                       ) : formatCurrency(b.spent)}
                     </td>
-                    <td className={`px-4 py-2.5 text-right ${remaining >= 0 ? "text-green-600" : "text-red-500"}`}>
+                    <td className="px-4 py-2.5 text-right" style={{ color: remaining >= 0 ? positiveColor : "#EF4444" }}>
                       {formatCurrency(remaining)}
                     </td>
                     <td className="px-4 py-2.5 text-right">
@@ -238,22 +366,29 @@ export default function BudgetPage() {
                         <div className="w-14 h-2 bg-muted rounded-full overflow-hidden">
                           <div className="h-full rounded-full" style={{
                             width: `${Math.min(100, pacing)}%`,
-                            backgroundColor: pacing > 100 ? "#EF4444" : pacing > 90 ? "#D97706" : "#16A34A",
+                            backgroundColor: pacing > 100 ? "#EF4444" : pacing > 90 ? "#D97706" : positiveColor,
                           }} />
                         </div>
                         <span className="text-xs w-8 text-right">{pacing}%</span>
                       </div>
                     </td>
                     <td className="px-4 py-2.5 text-center">
-                      {isEditing ? (
-                        <button onClick={saveEdit} className="p-1 rounded hover:bg-green-100">
-                          <Check className="h-3.5 w-3.5 text-green-600" />
-                        </button>
-                      ) : (
-                        <button onClick={() => startEdit(i)} className="p-1 rounded hover:bg-muted">
-                          <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                        </button>
-                      )}
+                      <div className="flex items-center justify-center gap-1">
+                        {isEditing ? (
+                          <button onClick={saveEdit} className="p-1 rounded hover:bg-muted">
+                            <Check className="h-3.5 w-3.5 text-primary" />
+                          </button>
+                        ) : (
+                          <>
+                            <button onClick={() => startEdit(i)} className="p-1 rounded hover:bg-muted">
+                              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                            </button>
+                            <button onClick={() => deleteRow(i)} className="p-1 rounded hover:bg-red-50">
+                              <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-red-500" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

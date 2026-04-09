@@ -32,12 +32,21 @@ export const externalLinks: Record<string, { name: string; url: string }[]> = {
   "/call-logs": [
     { name: "CallRail", url: "https://app.callrail.com/analytics/a/722917772/reports/call-list" },
     { name: "RingCentral", url: "https://app.ringcentral.com" },
+    { name: "RingSense", url: "https://ringsense.ringcentral.com/calls?currentTab=allCalls&filterId=12989dcc-a46c-413f-b8a5-181362cd8a65" },
   ],
   "/go-high-level": [
     { name: "Go High Level", url: "https://crm.nationwidehaul.com/v2/location/IEs4Gwg925sPu0AYNpdS/dashboard" },
   ],
   "/inventory-platforms": [
     { name: "CallRail", url: "https://app.callrail.com/analytics/a/722917772/reports/call-list" },
+  ],
+  "/referral-sources": [
+    { name: "Go High Level CRM", url: "https://crm.nationwidehaul.com" },
+  ],
+  "/roi-metrics": [
+    { name: "Google Ads", url: "https://ads.google.com/aw/overview?ocid=8013003786" },
+    { name: "Meta Ads", url: "https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=233729070644721" },
+    { name: "Go High Level CRM", url: "https://crm.nationwidehaul.com" },
   ],
   "/budget": [
     { name: "Google Ads", url: "https://ads.google.com/aw/overview?ocid=8013003786" },

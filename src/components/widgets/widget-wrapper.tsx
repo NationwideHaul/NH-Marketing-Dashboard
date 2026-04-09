@@ -7,18 +7,30 @@ import { StatWidget } from "./stat-widget";
 import { ChartWidget } from "./chart-widget";
 import { GoalWidget } from "./goal-widget";
 import { TableWidget } from "./table-widget";
+import { ManualStatWidget } from "./manual-stat-widget";
+import { InteractiveStatWidget } from "./interactive-stat-widget";
+import { SectionHeaderWidget } from "./section-header-widget";
+import { TopContentWidget } from "./top-content-widget";
+import { RecentContentWidget } from "./recent-content-widget";
+import { ActiveAdsWidget } from "./active-ads-widget";
 import { WidgetConfigPanel } from "./widget-config-panel";
 import { getDataSource } from "@/lib/widget-registry";
 import type { WidgetConfig } from "@/types/widget";
 
 const widgetComponents: Record<string, React.ComponentType<{ config: WidgetConfig }>> = {
   "stat": StatWidget,
+  "interactive-stat": InteractiveStatWidget,
+  "manual-stat": ManualStatWidget,
   "line-chart": ChartWidget,
   "bar-chart": ChartWidget,
   "area-chart": ChartWidget,
   "pie-chart": ChartWidget,
   "table": TableWidget,
   "goal-tracker": GoalWidget,
+  "section-header": SectionHeaderWidget,
+  "top-content": TopContentWidget,
+  "recent-content": RecentContentWidget,
+  "active-ads": ActiveAdsWidget,
 };
 
 export function WidgetWrapper({ config }: { config: WidgetConfig }) {
@@ -27,16 +39,33 @@ export function WidgetWrapper({ config }: { config: WidgetConfig }) {
   const Component = widgetComponents[config.type];
   const ds = getDataSource(config.dataSource);
 
+  // Section headers get a minimal wrapper
+  if (config.type === "section-header") {
+    return (
+      <div className="flex flex-col h-full">
+        {editMode && (
+          <div className="absolute top-0 right-0 flex items-center gap-0.5 z-10">
+            <GripVertical className="h-3.5 w-3.5 text-muted-foreground cursor-grab drag-handle" />
+            <button onClick={() => removeWidget(config.id)} className="p-1 rounded hover:bg-red-100 transition-colors" title="Remove">
+              <X className="h-3 w-3 text-red-500" />
+            </button>
+          </div>
+        )}
+        {Component && <Component config={config} />}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full rounded-lg border border-border bg-card shadow-sm overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           {editMode && <GripVertical className="h-3.5 w-3.5 text-muted-foreground cursor-grab shrink-0 drag-handle" />}
-          <span className="text-xs font-medium text-card-foreground truncate">{config.title}</span>
+          <span className="text-base font-semibold text-card-foreground truncate">{config.title}</span>
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
-          {ds && <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded hidden sm:block">{ds.label}</span>}
+          {ds && <span className="text-xs text-muted-foreground px-1.5 py-0.5 bg-muted rounded hidden sm:block">{ds.label}</span>}
           <button onClick={() => setShowConfig(true)} className="p-1 rounded hover:bg-muted transition-colors" title="Settings">
             <Settings className="h-3 w-3 text-muted-foreground" />
           </button>

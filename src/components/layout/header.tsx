@@ -30,6 +30,8 @@ const comparisonPresets = [
 export function Header() {
   const { dateRange, setDateRange, comparison, setComparisonEnabled, setComparisonPreset } = useDateRange();
   const { editMode, toggleEditMode, setShowPicker, resetDashboard } = useDashboard();
+  const { currentAccount } = useAccount();
+  const primaryColor = currentAccount.colors.primary;
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [tempRange, setTempRange] = useState<{ from?: Date; to?: Date }>({ from: dateRange.from, to: dateRange.to });
@@ -64,7 +66,8 @@ export function Header() {
         {editMode && (
           <>
             <button onClick={() => setShowPicker(true)}
-              className="flex items-center gap-1.5 rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 transition-colors">
+              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-white transition-colors"
+              style={{ backgroundColor: primaryColor }}>
               <Plus className="h-3 w-3" /> Add Widget
             </button>
             <button onClick={resetDashboard}
@@ -114,9 +117,9 @@ export function Header() {
       {showDatePicker && typeof window !== "undefined" && createPortal(
         <div className="fixed inset-0 flex items-start justify-end pt-14 pr-4" style={{ zIndex: 9999 }}>
           <div className="absolute inset-0" onClick={() => setShowDatePicker(false)} />
-          <div className="relative bg-white rounded-lg shadow-xl border border-gray-200 p-4 max-w-[640px] max-h-[calc(100vh-4rem)] overflow-y-auto">
-            {/* Presets */}
-            <div className="flex flex-wrap gap-1.5 mb-3 pb-3 border-b border-gray-200">
+          <div className="relative bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden w-auto">
+            {/* Presets row */}
+            <div className="flex gap-1 px-3 pt-3 pb-2">
               {presets.map((p) => (
                 <button key={p.label} onClick={() => {
                   const dates = p.getDates();
@@ -124,38 +127,63 @@ export function Header() {
                   setDateRange(dates);
                   setShowDatePicker(false);
                 }}
-                className="px-2.5 py-1 text-xs border border-gray-200 rounded-md hover:bg-red-50 hover:border-red-300 transition-colors">
+                className="px-2 py-1 text-[11px] font-medium rounded-md border border-gray-200 text-gray-600 hover:border-gray-400 hover:text-gray-900 transition-colors">
                   {p.label}
                 </button>
               ))}
             </div>
 
-            {/* Date inputs */}
-            <div className="flex items-center gap-2 mb-3">
-              <input type="text" readOnly value={tempRange.from ? format(tempRange.from, "MMM d, yyyy") : ""}
-                className="px-3 py-1.5 text-xs border border-gray-300 rounded-md bg-gray-50 w-32 text-center" />
-              <span className="text-xs text-gray-400">–</span>
-              <input type="text" readOnly value={tempRange.to ? format(tempRange.to, "MMM d, yyyy") : ""}
-                className="px-3 py-1.5 text-xs border border-gray-300 rounded-md bg-gray-50 w-32 text-center" />
+            <div className="border-t border-gray-100" />
+
+            {/* Date inputs + calendar */}
+            <div className="px-3 pt-2 pb-3">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex-1 px-2.5 py-1 text-[11px] font-medium border border-gray-200 rounded-md bg-gray-50 text-center text-gray-700">
+                  {tempRange.from ? format(tempRange.from, "MMM d, yyyy") : "Start"}
+                </div>
+                <span className="text-[10px] text-gray-300 font-medium">→</span>
+                <div className="flex-1 px-2.5 py-1 text-[11px] font-medium border border-gray-200 rounded-md bg-gray-50 text-center text-gray-700">
+                  {tempRange.to ? format(tempRange.to, "MMM d, yyyy") : "End"}
+                </div>
+              </div>
+
+              {/* Calendar */}
+              <DayPicker
+                mode="range"
+                selected={{ from: tempRange.from, to: tempRange.to }}
+                onSelect={(range) => {
+                  if (range) setTempRange({ from: range.from, to: range.to });
+                }}
+                numberOfMonths={2}
+                defaultMonth={subMonths(new Date(), 1)}
+                classNames={{
+                  months: "flex gap-2",
+                  month_caption: "text-xs font-semibold text-gray-800 pb-1",
+                  weekday: "text-[10px] font-medium text-gray-400 w-7 h-6",
+                  day_button: "w-7 h-7 text-[11px] rounded-md transition-colors",
+                  day: "p-0",
+                  today: "font-bold",
+                  selected: "!bg-[var(--brand)] !text-white !rounded-md",
+                  range_start: "!bg-[var(--brand)] !text-white !rounded-l-md !rounded-r-none",
+                  range_end: "!bg-[var(--brand)] !text-white !rounded-r-md !rounded-l-none",
+                  range_middle: "!bg-[var(--brand-light)] !text-[var(--brand)] !rounded-none",
+                  chevron: "fill-gray-500 w-3.5 h-3.5",
+                  nav: "gap-1",
+                }}
+                style={{
+                  "--brand": primaryColor,
+                  "--brand-light": primaryColor + "18",
+                  fontSize: "11px",
+                } as React.CSSProperties}
+              />
+
+              {/* Apply button */}
+              <button onClick={handleSetRange}
+                className="w-full mt-2 py-1.5 text-white text-xs font-semibold rounded-lg transition-colors hover:opacity-90"
+                style={{ backgroundColor: primaryColor }}>
+                Apply Range
+              </button>
             </div>
-
-            {/* Calendar */}
-            <DayPicker
-              mode="range"
-              selected={{ from: tempRange.from, to: tempRange.to }}
-              onSelect={(range) => {
-                if (range) setTempRange({ from: range.from, to: range.to });
-              }}
-              numberOfMonths={2}
-              defaultMonth={subMonths(new Date(), 1)}
-              style={{ fontSize: "13px" }}
-            />
-
-            {/* Set Range Button */}
-            <button onClick={handleSetRange}
-              className="w-full mt-2 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
-              Set Range
-            </button>
           </div>
         </div>,
         document.body

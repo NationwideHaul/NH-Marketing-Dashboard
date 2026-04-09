@@ -213,20 +213,20 @@ export const metaAdsDefaults: PageDefault = {
     { id: "ma-8", type: "stat", title: "Cost Per Lead", dataSource: "meta-ads", metric: "costPerLead", format: "currency", comparisonEnabled: true },
     { id: "ma-9", type: "area-chart", title: "Spend Over Time", dataSource: "meta-ads", metric: "spend", format: "currency" },
     { id: "ma-10", type: "line-chart", title: "Reach Over Time", dataSource: "meta-ads", metric: "reach", format: "number" },
-    { id: "ma-11", type: "table", title: "Campaign Performance", dataSource: "meta-ads", metric: "spend", format: "currency" },
+    { id: "ma-ads", type: "active-ads", title: "Active Ads", dataSource: "meta-ads", metric: "spend", format: "currency" },
   ],
   layouts: {
     lg: [
       ...row([{ id: "ma-1", w: 3, h: 2 }, { id: "ma-2", w: 3, h: 2 }, { id: "ma-3", w: 3, h: 2 }, { id: "ma-4", w: 3, h: 2 }], 0),
       ...row([{ id: "ma-5", w: 3, h: 2 }, { id: "ma-6", w: 3, h: 2 }, { id: "ma-7", w: 3, h: 2 }, { id: "ma-8", w: 3, h: 2 }], 2),
       ...row([{ id: "ma-9", w: 6, h: 5, minW: 3, minH: 3 }, { id: "ma-10", w: 6, h: 5, minW: 3, minH: 3 }], 4),
-      ...row([{ id: "ma-11", w: 12, h: 6, minW: 6, minH: 4 }], 9),
+      ...row([{ id: "ma-ads", w: 12, h: 8, minW: 6, minH: 5 }], 9),
     ],
     md: [
       ...row([{ id: "ma-1", w: 2, h: 2 }, { id: "ma-2", w: 2, h: 2 }, { id: "ma-3", w: 2, h: 2 }, { id: "ma-4", w: 2, h: 2 }], 0),
       ...row([{ id: "ma-5", w: 2, h: 2 }, { id: "ma-6", w: 2, h: 2 }, { id: "ma-7", w: 2, h: 2 }, { id: "ma-8", w: 2, h: 2 }], 2),
       ...row([{ id: "ma-9", w: 4, h: 5, minW: 3, minH: 3 }, { id: "ma-10", w: 4, h: 5, minW: 3, minH: 3 }], 4),
-      ...row([{ id: "ma-11", w: 8, h: 6, minW: 4, minH: 4 }], 9),
+      ...row([{ id: "ma-ads", w: 8, h: 8, minW: 4, minH: 5 }], 9),
     ],
   },
 };
@@ -238,17 +238,21 @@ export const facebookDefaults: PageDefault = {
     { id: "fb-2", type: "stat", title: "Interactions", dataSource: "facebook", metric: "postEngagement", format: "number", comparisonEnabled: true },
     { id: "fb-3", type: "stat", title: "Follows", dataSource: "facebook", metric: "followers", format: "number", comparisonEnabled: true },
     { id: "fb-4", type: "stat", title: "Reach", dataSource: "facebook", metric: "reach", format: "number", comparisonEnabled: true },
+    { id: "fb-tc", type: "top-content", title: "Top 3 Content This Period", dataSource: "facebook", metric: "postEngagement", format: "number" },
+    { id: "fb-rc", type: "recent-content", title: "Recent Content", dataSource: "facebook", metric: "postEngagement", format: "number" },
     { id: "fb-5", type: "area-chart", title: "Reach Over Time", dataSource: "facebook", metric: "reach", format: "number" },
     { id: "fb-6", type: "bar-chart", title: "Engagement Over Time", dataSource: "facebook", metric: "postEngagement", format: "number" },
   ],
   layouts: {
     lg: [
       ...row([{ id: "fb-1", w: 3, h: 2 }, { id: "fb-2", w: 3, h: 2 }, { id: "fb-3", w: 3, h: 2 }, { id: "fb-4", w: 3, h: 2 }], 0),
-      ...row([{ id: "fb-5", w: 6, h: 5, minW: 3, minH: 3 }, { id: "fb-6", w: 6, h: 5, minW: 3, minH: 3 }], 2),
+      ...row([{ id: "fb-tc", w: 6, h: 6, minW: 4, minH: 4 }, { id: "fb-rc", w: 6, h: 6, minW: 4, minH: 4 }], 2),
+      ...row([{ id: "fb-5", w: 6, h: 5, minW: 3, minH: 3 }, { id: "fb-6", w: 6, h: 5, minW: 3, minH: 3 }], 8),
     ],
     md: [
       ...row([{ id: "fb-1", w: 2, h: 2 }, { id: "fb-2", w: 2, h: 2 }, { id: "fb-3", w: 2, h: 2 }, { id: "fb-4", w: 2, h: 2 }], 0),
-      ...row([{ id: "fb-5", w: 4, h: 5, minW: 3, minH: 3 }, { id: "fb-6", w: 4, h: 5, minW: 3, minH: 3 }], 2),
+      ...row([{ id: "fb-tc", w: 4, h: 6, minW: 4, minH: 4 }, { id: "fb-rc", w: 4, h: 6, minW: 4, minH: 4 }], 2),
+      ...row([{ id: "fb-5", w: 4, h: 5, minW: 3, minH: 3 }, { id: "fb-6", w: 4, h: 5, minW: 3, minH: 3 }], 8),
     ],
   },
 };
@@ -259,17 +263,21 @@ export const instagramDefaults: PageDefault = {
     { id: "ig-2", type: "stat", title: "Reach", dataSource: "instagram", metric: "reach", format: "number", comparisonEnabled: true },
     { id: "ig-3", type: "stat", title: "Likes", dataSource: "instagram", metric: "likes", format: "number", comparisonEnabled: true },
     { id: "ig-4", type: "stat", title: "Saves", dataSource: "instagram", metric: "saves", format: "number", comparisonEnabled: true },
+    { id: "ig-tc", type: "top-content", title: "Top 3 Content This Period", dataSource: "instagram", metric: "likes", format: "number" },
+    { id: "ig-rc", type: "recent-content", title: "Recent Content", dataSource: "instagram", metric: "likes", format: "number" },
     { id: "ig-5", type: "area-chart", title: "Reach Over Time", dataSource: "instagram", metric: "reach", format: "number" },
     { id: "ig-6", type: "bar-chart", title: "Engagement Over Time", dataSource: "instagram", metric: "likes", format: "number" },
   ],
   layouts: {
     lg: [
       ...row([{ id: "ig-1", w: 3, h: 2 }, { id: "ig-2", w: 3, h: 2 }, { id: "ig-3", w: 3, h: 2 }, { id: "ig-4", w: 3, h: 2 }], 0),
-      ...row([{ id: "ig-5", w: 6, h: 5, minW: 3, minH: 3 }, { id: "ig-6", w: 6, h: 5, minW: 3, minH: 3 }], 2),
+      ...row([{ id: "ig-tc", w: 6, h: 6, minW: 4, minH: 4 }, { id: "ig-rc", w: 6, h: 6, minW: 4, minH: 4 }], 2),
+      ...row([{ id: "ig-5", w: 6, h: 5, minW: 3, minH: 3 }, { id: "ig-6", w: 6, h: 5, minW: 3, minH: 3 }], 8),
     ],
     md: [
       ...row([{ id: "ig-1", w: 2, h: 2 }, { id: "ig-2", w: 2, h: 2 }, { id: "ig-3", w: 2, h: 2 }, { id: "ig-4", w: 2, h: 2 }], 0),
-      ...row([{ id: "ig-5", w: 4, h: 5, minW: 3, minH: 3 }, { id: "ig-6", w: 4, h: 5, minW: 3, minH: 3 }], 2),
+      ...row([{ id: "ig-tc", w: 4, h: 6, minW: 4, minH: 4 }, { id: "ig-rc", w: 4, h: 6, minW: 4, minH: 4 }], 2),
+      ...row([{ id: "ig-5", w: 4, h: 5, minW: 3, minH: 3 }, { id: "ig-6", w: 4, h: 5, minW: 3, minH: 3 }], 8),
     ],
   },
 };
@@ -280,17 +288,21 @@ export const youtubeDefaults: PageDefault = {
     { id: "yt-2", type: "stat", title: "Watch Time (hrs)", dataSource: "youtube", metric: "watchTime", format: "number", comparisonEnabled: true },
     { id: "yt-3", type: "stat", title: "Subscribers", dataSource: "youtube", metric: "subscribers", format: "number", comparisonEnabled: true },
     { id: "yt-4", type: "stat", title: "Likes", dataSource: "youtube", metric: "likes", format: "number", comparisonEnabled: true },
+    { id: "yt-tc", type: "top-content", title: "Your Top Content", dataSource: "youtube", metric: "views", format: "number" },
+    { id: "yt-rc", type: "recent-content", title: "Latest Content", dataSource: "youtube", metric: "views", format: "number" },
     { id: "yt-5", type: "area-chart", title: "Views Over Time", dataSource: "youtube", metric: "views", format: "number" },
     { id: "yt-6", type: "bar-chart", title: "Likes Over Time", dataSource: "youtube", metric: "likes", format: "number" },
   ],
   layouts: {
     lg: [
       ...row([{ id: "yt-1", w: 3, h: 2 }, { id: "yt-2", w: 3, h: 2 }, { id: "yt-3", w: 3, h: 2 }, { id: "yt-4", w: 3, h: 2 }], 0),
-      ...row([{ id: "yt-5", w: 6, h: 5, minW: 3, minH: 3 }, { id: "yt-6", w: 6, h: 5, minW: 3, minH: 3 }], 2),
+      ...row([{ id: "yt-tc", w: 6, h: 6, minW: 4, minH: 4 }, { id: "yt-rc", w: 6, h: 6, minW: 4, minH: 4 }], 2),
+      ...row([{ id: "yt-5", w: 6, h: 5, minW: 3, minH: 3 }, { id: "yt-6", w: 6, h: 5, minW: 3, minH: 3 }], 8),
     ],
     md: [
       ...row([{ id: "yt-1", w: 2, h: 2 }, { id: "yt-2", w: 2, h: 2 }, { id: "yt-3", w: 2, h: 2 }, { id: "yt-4", w: 2, h: 2 }], 0),
-      ...row([{ id: "yt-5", w: 4, h: 5, minW: 3, minH: 3 }, { id: "yt-6", w: 4, h: 5, minW: 3, minH: 3 }], 2),
+      ...row([{ id: "yt-tc", w: 4, h: 6, minW: 4, minH: 4 }, { id: "yt-rc", w: 4, h: 6, minW: 4, minH: 4 }], 2),
+      ...row([{ id: "yt-5", w: 4, h: 5, minW: 3, minH: 3 }, { id: "yt-6", w: 4, h: 5, minW: 3, minH: 3 }], 8),
     ],
   },
 };
@@ -311,6 +323,147 @@ export const linkedinDefaults: PageDefault = {
     md: [
       ...row([{ id: "li-1", w: 2, h: 2 }, { id: "li-2", w: 2, h: 2 }, { id: "li-3", w: 2, h: 2 }, { id: "li-4", w: 2, h: 2 }], 0),
       ...row([{ id: "li-5", w: 8, h: 5, minW: 4, minH: 3 }], 2),
+    ],
+  },
+};
+
+// ==================== NFI OVERVIEW ====================
+export const nfiOverviewDefaults: PageDefault = {
+  widgets: [
+    // Row 1: Website & Email stats
+    { id: "nfi-1", type: "stat", title: "Website Total Visitors", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true },
+    { id: "nfi-2", type: "stat", title: "Email Campaign Opens (GHL)", dataSource: "email-marketing", metric: "emailsSent", format: "number", comparisonEnabled: true },
+    { id: "nfi-3", type: "stat", title: "Email Campaign Clicks (GHL)", dataSource: "email-marketing", metric: "newContacts", format: "number", comparisonEnabled: true },
+    { id: "nfi-3b", type: "manual-stat", title: "Email Campaign Replied (GHL)", dataSource: "email-marketing", metric: "replied", format: "number", manualValue: 0 },
+    // Row 2: PPC stats
+    { id: "nfi-4", type: "stat", title: "Paid Search Traffic (PPC)", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true, dimension: "sessionDefaultChannelGroup" },
+    { id: "nfi-5", type: "stat", title: "PPC Total Clicks", dataSource: "google-ads", metric: "clicks", format: "number", comparisonEnabled: true },
+    { id: "nfi-6", type: "stat", title: "PPC Cost Per Click", dataSource: "google-ads", metric: "cpc", format: "currency", comparisonEnabled: true },
+    { id: "nfi-7", type: "stat", title: "PPC Identified Conversions", dataSource: "google-ads", metric: "conversions", format: "number", comparisonEnabled: true },
+    // Row 3: Calls & Truck Paper
+    { id: "nfi-8", type: "stat", title: "Total Phone Calls (CallRail)", dataSource: "callrail", metric: "totalCalls", format: "number", comparisonEnabled: true },
+    { id: "nfi-9", type: "stat", title: "Truck Paper Phone Calls", dataSource: "callrail", metric: "firstTimeCalls", format: "number", comparisonEnabled: true },
+    { id: "nfi-10", type: "stat", title: "Truck Paper Info Submits", dataSource: "google-analytics", metric: "conversions", format: "number", comparisonEnabled: true },
+    { id: "nfi-12", type: "manual-stat", title: "Banner Ad Clicks (Truck Paper)", dataSource: "overview", metric: "bannerClicks", format: "number", manualValue: 0 },
+    // Section: Trends Over Time
+    { id: "nfi-sec", type: "section-header", title: "Trends Over Time", dataSource: "overview", metric: "none", format: "number", sectionTitle: "Trends Over Time" },
+    // Charts — 5 months of data for monthly comparison
+    { id: "nfi-13", type: "line-chart", title: "Website Traffic", dataSource: "google-analytics", metric: "sessions", format: "number", trendMonths: 5 },
+    { id: "nfi-14", type: "bar-chart", title: "PPC Clicks", dataSource: "google-ads", metric: "clicks", format: "number", trendMonths: 5 },
+    { id: "nfi-15", type: "line-chart", title: "PPC Conversions", dataSource: "google-ads", metric: "conversions", format: "number", trendMonths: 5 },
+    { id: "nfi-16", type: "line-chart", title: "PPC Cost Per Click", dataSource: "google-ads", metric: "cpc", format: "currency", trendMonths: 5 },
+    { id: "nfi-17", type: "area-chart", title: "Total Phone Calls", dataSource: "callrail", metric: "totalCalls", format: "number", trendMonths: 5 },
+    { id: "nfi-18", type: "bar-chart", title: "Email Opens", dataSource: "email-marketing", metric: "emailsSent", format: "number", trendMonths: 5 },
+  ],
+  layouts: {
+    lg: [
+      // Row 1: 4 stat cards (website + email)
+      ...row([{ id: "nfi-1", w: 3, h: 2 }, { id: "nfi-2", w: 3, h: 2 }, { id: "nfi-3", w: 3, h: 2 }, { id: "nfi-3b", w: 3, h: 2 }], 0),
+      // Row 2: 4 stat cards (PPC)
+      ...row([{ id: "nfi-4", w: 3, h: 2 }, { id: "nfi-5", w: 3, h: 2 }, { id: "nfi-6", w: 3, h: 2 }, { id: "nfi-7", w: 3, h: 2 }], 2),
+      // Row 3: 4 stat cards (calls + truck paper)
+      ...row([{ id: "nfi-8", w: 3, h: 2 }, { id: "nfi-9", w: 3, h: 2 }, { id: "nfi-10", w: 3, h: 2 }, { id: "nfi-12", w: 3, h: 2 }], 4),
+      // Section header
+      ...row([{ id: "nfi-sec", w: 12, h: 1 }], 6),
+      // Row 4: 3 charts
+      ...row([{ id: "nfi-13", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-14", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-15", w: 4, h: 5, minW: 3, minH: 3 }], 7),
+      // Row 5: 3 more charts
+      ...row([{ id: "nfi-16", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-17", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-18", w: 4, h: 5, minW: 3, minH: 3 }], 12),
+    ],
+    md: [
+      ...row([{ id: "nfi-1", w: 2, h: 2 }, { id: "nfi-2", w: 2, h: 2 }, { id: "nfi-3", w: 2, h: 2 }, { id: "nfi-3b", w: 2, h: 2 }], 0),
+      ...row([{ id: "nfi-4", w: 2, h: 2 }, { id: "nfi-5", w: 2, h: 2 }, { id: "nfi-6", w: 2, h: 2 }, { id: "nfi-7", w: 2, h: 2 }], 2),
+      ...row([{ id: "nfi-8", w: 2, h: 2 }, { id: "nfi-9", w: 2, h: 2 }, { id: "nfi-10", w: 2, h: 2 }, { id: "nfi-12", w: 2, h: 2 }], 4),
+      ...row([{ id: "nfi-sec", w: 8, h: 1 }], 6),
+      ...row([{ id: "nfi-13", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-14", w: 4, h: 5, minW: 3, minH: 3 }], 7),
+      ...row([{ id: "nfi-15", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-16", w: 4, h: 5, minW: 3, minH: 3 }], 12),
+      ...row([{ id: "nfi-17", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-18", w: 4, h: 5, minW: 3, minH: 3 }], 17),
+    ],
+  },
+};
+
+// ==================== NH OVERVIEW (Dealership) ====================
+export const nhOverviewDefaults: PageDefault = {
+  widgets: [
+    // Row 1: Interactive stats (click to see 12-month chart)
+    { id: "nh-1", type: "interactive-stat", title: "Total Phone Calls", dataSource: "callrail", metric: "totalCalls", format: "number", comparisonEnabled: true },
+    { id: "nh-2", type: "interactive-stat", title: "Total Info Submits", dataSource: "google-analytics", metric: "conversions", format: "number", comparisonEnabled: true },
+    { id: "nh-3", type: "interactive-stat", title: "Total Website Visitors", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true },
+    { id: "nh-4", type: "interactive-stat", title: "Overall Social Media Interactions", dataSource: "overview", metric: "socialEngagement", format: "number", comparisonEnabled: true },
+    // Row 2: Source graphics
+    { id: "nh-5", type: "pie-chart", title: "Sessions by Traffic Source", dataSource: "google-analytics", metric: "sessions", format: "number", dimension: "sessionDefaultChannelGroup" },
+    { id: "nh-6", type: "bar-chart", title: "Conversion Rate Per Source", dataSource: "google-analytics", metric: "conversions", format: "number", dimension: "sessionDefaultChannelGroup" },
+    // Section: Trends Over Time
+    { id: "nh-sec", type: "section-header", title: "Trends Over Time", dataSource: "overview", metric: "none", format: "number", sectionTitle: "Trends Over Time" },
+    // Trend charts (5 months)
+    { id: "nh-c1", type: "line-chart", title: "Website Traffic", dataSource: "google-analytics", metric: "sessions", format: "number", trendMonths: 5 },
+    { id: "nh-c2", type: "area-chart", title: "Phone Calls", dataSource: "callrail", metric: "totalCalls", format: "number", trendMonths: 5 },
+    { id: "nh-c3", type: "line-chart", title: "Info Submits", dataSource: "overview", metric: "infoSubmits", format: "number", trendMonths: 5 },
+    { id: "nh-c4", type: "bar-chart", title: "PPC Clicks", dataSource: "google-ads", metric: "clicks", format: "number", trendMonths: 5 },
+    { id: "nh-c5", type: "bar-chart", title: "Social Media Engagement", dataSource: "overview", metric: "socialEngagement", format: "number", trendMonths: 5 },
+    { id: "nh-c6", type: "line-chart", title: "Conversion Rate Trend", dataSource: "overview", metric: "conversionRate", format: "percent", trendMonths: 5 },
+  ],
+  layouts: {
+    lg: [
+      // Row 1: 4 interactive stat cards
+      ...row([{ id: "nh-1", w: 3, h: 2 }, { id: "nh-2", w: 3, h: 2 }, { id: "nh-3", w: 3, h: 2 }, { id: "nh-4", w: 3, h: 2 }], 0),
+      // Row 2: Source graphics
+      ...row([{ id: "nh-5", w: 6, h: 5, minW: 3, minH: 3 }, { id: "nh-6", w: 6, h: 5, minW: 3, minH: 3 }], 2),
+      // Section header
+      ...row([{ id: "nh-sec", w: 12, h: 1 }], 7),
+      // Trend charts row 1
+      ...row([{ id: "nh-c1", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nh-c2", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nh-c3", w: 4, h: 5, minW: 3, minH: 3 }], 8),
+      // Trend charts row 2
+      ...row([{ id: "nh-c4", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nh-c5", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nh-c6", w: 4, h: 5, minW: 3, minH: 3 }], 13),
+    ],
+    md: [
+      ...row([{ id: "nh-1", w: 2, h: 2 }, { id: "nh-2", w: 2, h: 2 }, { id: "nh-3", w: 2, h: 2 }, { id: "nh-4", w: 2, h: 2 }], 0),
+      ...row([{ id: "nh-5", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nh-6", w: 4, h: 5, minW: 3, minH: 3 }], 2),
+      ...row([{ id: "nh-sec", w: 8, h: 1 }], 7),
+      ...row([{ id: "nh-c1", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nh-c2", w: 4, h: 5, minW: 3, minH: 3 }], 8),
+      ...row([{ id: "nh-c3", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nh-c4", w: 4, h: 5, minW: 3, minH: 3 }], 13),
+      ...row([{ id: "nh-c5", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nh-c6", w: 4, h: 5, minW: 3, minH: 3 }], 18),
+    ],
+  },
+};
+
+// ==================== ROAD READY OVERVIEW ====================
+export const rriOverviewDefaults: PageDefault = {
+  widgets: [
+    // Row 1: Key stats (no Ad Spend)
+    { id: "rri-1", type: "interactive-stat", title: "Total Sessions", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true },
+    { id: "rri-2", type: "interactive-stat", title: "Total Leads", dataSource: "meta-ads", metric: "conversions", format: "number", comparisonEnabled: true },
+    { id: "rri-3", type: "interactive-stat", title: "Phone Calls", dataSource: "callrail", metric: "totalCalls", format: "number", comparisonEnabled: true },
+    { id: "rri-4", type: "interactive-stat", title: "Email Open Rate", dataSource: "email-marketing", metric: "openRate", format: "percent", comparisonEnabled: true },
+    // Row 2: Charts (no Google Ads Clicks)
+    { id: "rri-5", type: "area-chart", title: "Website Traffic", dataSource: "google-analytics", metric: "sessions", format: "number" },
+    { id: "rri-6", type: "line-chart", title: "Leads Over Time", dataSource: "meta-ads", metric: "conversions", format: "number" },
+    // Row 3: More stats (no Monthly Ad Budget)
+    { id: "rri-7", type: "stat", title: "IG Followers", dataSource: "instagram", metric: "followers", format: "number", comparisonEnabled: true },
+    { id: "rri-8", type: "stat", title: "FB Reach", dataSource: "facebook", metric: "reach", format: "number", comparisonEnabled: true },
+    { id: "rri-9", type: "stat", title: "New Contacts", dataSource: "email-marketing", metric: "newContacts", format: "number", comparisonEnabled: true },
+    { id: "rri-10", type: "stat", title: "GMB Profile Views", dataSource: "gmb", metric: "profileViews", format: "number", comparisonEnabled: true },
+    // Section: Trends
+    { id: "rri-sec", type: "section-header", title: "Trends Over Time", dataSource: "overview", metric: "none", format: "number", sectionTitle: "Trends Over Time" },
+    { id: "rri-c1", type: "line-chart", title: "Phone Calls Trend", dataSource: "callrail", metric: "totalCalls", format: "number", trendMonths: 5 },
+    { id: "rri-c2", type: "bar-chart", title: "Social Media Engagement", dataSource: "overview", metric: "socialEngagement", format: "number", trendMonths: 5 },
+    { id: "rri-c3", type: "area-chart", title: "Email Campaign Performance", dataSource: "email-marketing", metric: "emailsSent", format: "number", trendMonths: 5 },
+  ],
+  layouts: {
+    lg: [
+      ...row([{ id: "rri-1", w: 3, h: 2 }, { id: "rri-2", w: 3, h: 2 }, { id: "rri-3", w: 3, h: 2 }, { id: "rri-4", w: 3, h: 2 }], 0),
+      ...row([{ id: "rri-5", w: 6, h: 5, minW: 3, minH: 3 }, { id: "rri-6", w: 6, h: 5, minW: 3, minH: 3 }], 2),
+      ...row([{ id: "rri-7", w: 3, h: 2 }, { id: "rri-8", w: 3, h: 2 }, { id: "rri-9", w: 3, h: 2 }, { id: "rri-10", w: 3, h: 2 }], 7),
+      ...row([{ id: "rri-sec", w: 12, h: 1 }], 9),
+      ...row([{ id: "rri-c1", w: 4, h: 5, minW: 3, minH: 3 }, { id: "rri-c2", w: 4, h: 5, minW: 3, minH: 3 }, { id: "rri-c3", w: 4, h: 5, minW: 3, minH: 3 }], 10),
+    ],
+    md: [
+      ...row([{ id: "rri-1", w: 2, h: 2 }, { id: "rri-2", w: 2, h: 2 }, { id: "rri-3", w: 2, h: 2 }, { id: "rri-4", w: 2, h: 2 }], 0),
+      ...row([{ id: "rri-5", w: 4, h: 5, minW: 3, minH: 3 }, { id: "rri-6", w: 4, h: 5, minW: 3, minH: 3 }], 2),
+      ...row([{ id: "rri-7", w: 2, h: 2 }, { id: "rri-8", w: 2, h: 2 }, { id: "rri-9", w: 2, h: 2 }, { id: "rri-10", w: 2, h: 2 }], 7),
+      ...row([{ id: "rri-sec", w: 8, h: 1 }], 9),
+      ...row([{ id: "rri-c1", w: 4, h: 5, minW: 3, minH: 3 }, { id: "rri-c2", w: 4, h: 5, minW: 3, minH: 3 }], 10),
+      ...row([{ id: "rri-c3", w: 4, h: 5, minW: 3, minH: 3 }], 15),
     ],
   },
 };

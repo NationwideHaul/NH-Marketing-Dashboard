@@ -1,11 +1,17 @@
 export type WidgetType =
   | "stat"
+  | "interactive-stat"
+  | "manual-stat"
   | "line-chart"
   | "bar-chart"
   | "area-chart"
   | "pie-chart"
   | "table"
-  | "goal-tracker";
+  | "goal-tracker"
+  | "section-header"
+  | "top-content"
+  | "recent-content"
+  | "active-ads";
 
 export type DataSource =
   | "google-analytics"
@@ -31,6 +37,9 @@ export interface WidgetConfig {
   comparisonEnabled?: boolean;
   goalValue?: number;
   dimension?: string; // GA4 dimension override (e.g. "deviceCategory", "sessionDefaultChannelGroup", "sessionSource")
+  manualValue?: number; // For manual-stat widgets: default value (editable by user, persisted in localStorage)
+  sectionTitle?: string; // For section-header widgets: display title
+  trendMonths?: number; // For chart widgets: override date range to show N months of data
 }
 
 export interface LayoutItem {

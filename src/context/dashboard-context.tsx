@@ -5,8 +5,7 @@ import { usePathname } from "next/navigation";
 import type { WidgetConfig, LayoutItem, DashboardConfig } from "@/types/widget";
 import { saveDashboard, loadDashboard, clearDashboard } from "@/lib/dashboard-storage";
 import { defaultWidgetSizes, getNextPosition } from "@/lib/widget-registry";
-import { pageDefaults } from "@/lib/page-defaults";
-import { overviewDefaults } from "@/lib/page-defaults";
+import { pageDefaults, overviewDefaults, nfiOverviewDefaults, nhOverviewDefaults, rriOverviewDefaults } from "@/lib/page-defaults";
 import { useAccount } from "@/context/account-context";
 
 // Map dataSource to the tab it belongs to
@@ -81,7 +80,15 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       setLayouts(saved.layouts);
     } else {
       // Use page defaults, filtered by account capabilities
-      const defaults = pageDefaults[pageKey] || overviewDefaults;
+      // Account-specific overview defaults
+      let defaults = pageDefaults[pageKey] || overviewDefaults;
+      if (pageKey === "/" && currentAccount.id === "nfi-truck-sales") {
+        defaults = nfiOverviewDefaults;
+      } else if (pageKey === "/" && currentAccount.id === "nationwide-haul") {
+        defaults = nhOverviewDefaults;
+      } else if (pageKey === "/" && currentAccount.id === "road-ready") {
+        defaults = rriOverviewDefaults;
+      }
       const filteredWidgets = filterWidgetsForAccount(defaults.widgets, currentAccount.tabs);
       const widgetIds = new Set(filteredWidgets.map((w) => w.id));
       const filteredLayouts = filterLayouts(defaults.layouts, widgetIds);
@@ -147,7 +154,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   const resetDashboard = useCallback(() => {
     clearDashboard(`${currentAccount.id}:${pageKey}`);
-    const defaults = pageDefaults[pageKey] || overviewDefaults;
+    let defaults = pageDefaults[pageKey] || overviewDefaults;
+    if (pageKey === "/" && currentAccount.id === "nfi-truck-sales") {
+      defaults = nfiOverviewDefaults;
+    }
     const filteredWidgets = filterWidgetsForAccount(defaults.widgets, currentAccount.tabs);
     const widgetIds = new Set(filteredWidgets.map((w) => w.id));
     const filteredLayouts = filterLayouts(defaults.layouts, widgetIds);

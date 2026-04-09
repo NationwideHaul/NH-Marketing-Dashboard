@@ -18,13 +18,9 @@ export function StatWidget({ config }: { config: WidgetConfig }) {
 
   if (!metric) {
     return (
-      <div className="flex flex-col justify-center h-full px-4">
-        <div className="flex items-center gap-1.5 mb-1">
-          <span className="text-xs">{ds?.icon}</span>
-          <span className="text-[10px] text-gray-400 truncate">{config.title}</span>
-        </div>
-        <p className="text-lg text-gray-300">—</p>
-        <p className="text-[10px] text-gray-300">Sign in to connect</p>
+      <div className="flex flex-col justify-center h-full px-3 py-2">
+        <p className="text-lg text-muted-foreground/50">—</p>
+        <p className="text-[10px] text-muted-foreground/50">Sign in to connect</p>
       </div>
     );
   }
@@ -40,36 +36,30 @@ export function StatWidget({ config }: { config: WidgetConfig }) {
   const TrendIcon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
 
   return (
-    <div className="relative flex flex-col justify-between h-full px-4 py-3 overflow-hidden">
+    <div className="relative flex flex-col justify-center h-full px-3 py-2 overflow-hidden">
       {sparkData.length > 2 && (
-        <div className="absolute inset-0 top-[40%] opacity-[0.08]">
+        <div className="absolute inset-0 top-[50%] opacity-[0.08]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={sparkData}>
-              <Area type="monotone" dataKey="v" stroke="#BE1E23" fill="#BE1E23" fillOpacity={1} strokeWidth={1.5} dot={false} />
+              <Area type="monotone" dataKey="v" stroke="var(--primary)" fill="var(--primary)" fillOpacity={1} strokeWidth={1.5} dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
       )}
 
-      <div className="relative z-10">
-        <div className="flex items-center gap-1.5 mb-1">
-          <span className="text-xs">{ds?.icon}</span>
-          <span className="text-[10px] text-gray-400 truncate">{config.title}</span>
-        </div>
-        <p className="text-2xl font-bold text-gray-900">{formattedValue}</p>
-      </div>
+      <p className="relative z-10 text-3xl font-bold text-foreground leading-tight">{formattedValue}</p>
 
-      {config.comparisonEnabled && change !== 0 && (
-        <div className="relative z-10 flex items-center gap-1">
+      {config.comparisonEnabled && (
+        <div className="relative z-10 flex items-center gap-1 mt-1">
           <TrendIcon className={cn("h-3 w-3",
-            trend === "up" && "text-green-600",
-            trend === "down" && "text-red-500",
-            trend === "flat" && "text-gray-400"
+            trend === "up" && "text-primary",
+            trend === "down" && "text-muted-foreground",
+            trend === "flat" && "text-muted-foreground"
           )} />
-          <span className={cn("text-[11px] font-medium",
-            trend === "up" && "text-green-600",
-            trend === "down" && "text-red-500",
-            trend === "flat" && "text-gray-400"
+          <span className={cn("text-xs font-medium",
+            trend === "up" && "text-primary",
+            trend === "down" && "text-muted-foreground",
+            trend === "flat" && "text-muted-foreground"
           )}>
             {change > 0 ? "+" : ""}{change.toFixed(1)}% vs prev
           </span>

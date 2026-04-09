@@ -9,10 +9,14 @@ import { format, parseISO } from "date-fns";
 import { useWidgetTimeSeries, useWidgetMetric } from "@/hooks/use-widget-data";
 import { formatNumber, formatCurrency, formatPercent } from "@/lib/utils";
 import { getDataSource } from "@/lib/widget-registry";
-import { aggregateWeekly } from "@/lib/mock-data/generator";
+import { aggregateMonthly } from "@/lib/mock-data/generator";
 import type { WidgetConfig } from "@/types/widget";
 
-const COLORS = ["#BE1E23", "#8C0F14", "#2563EB", "#16A34A", "#D97706", "#7C3AED", "#DB2777"];
+const COLORS = [
+  "var(--primary)", "var(--secondary)",
+  "var(--chart-accent-2)", "var(--chart-accent-3)",
+  "var(--chart-accent-4)", "var(--chart-accent-5)", "var(--chart-accent-6)",
+];
 
 function fmtVal(v: number, f: string) {
   if (f === "currency") return formatCurrency(v);
@@ -23,8 +27,8 @@ function fmtVal(v: number, f: string) {
 function fmtDate(d: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
   try {
     const s = String(d);
-    if (s.length === 8) return format(parseISO(s.slice(0,4)+"-"+s.slice(4,6)+"-"+s.slice(6,8)), "MMM d");
-    return format(parseISO(s), "MMM d");
+    if (s.length === 8) return format(parseISO(s.slice(0,4)+"-"+s.slice(4,6)+"-"+s.slice(6,8)), "MMM ''yy");
+    return format(parseISO(s), "MMM ''yy");
   } catch { return String(d); }
 }
 
@@ -37,16 +41,15 @@ export function ChartWidget({ config }: { config: WidgetConfig }) {
   const data = useMemo(() => {
     // Dimension-based data (categories like devices, channels) -- no aggregation needed
     if (isDimensionQuery) return rawData.map((p) => ({ date: p.date, value: p.value }));
-    if (rawData.length > 14) return aggregateWeekly(rawData).map((p) => ({ date: p.date, value: p.value }));
-    return rawData.map((p) => ({ date: p.date, value: p.value }));
+    // Always aggregate by month for trend charts
+    return aggregateMonthly(rawData).map((p) => ({ date: p.date, value: p.value }));
   }, [rawData, isDimensionQuery]);
 
   if (data.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center px-4">
-        <span className="text-lg mb-1">{ds?.icon}</span>
-        <p className="text-sm text-gray-400">No data available</p>
-        <p className="text-[10px] text-gray-300">Sign in or check API connection</p>
+        <p className="text-sm text-muted-foreground">No data available</p>
+        <p className="text-xs text-muted-foreground/50">Sign in or check API connection</p>
       </div>
     );
   }
@@ -66,9 +69,8 @@ export function ChartWidget({ config }: { config: WidgetConfig }) {
   return (
     <div className="h-full w-full flex flex-col">
       {/* Header with total */}
-      <div className="flex items-center justify-between px-3 pt-1">
-        <span className="text-xs text-gray-400">{ds?.icon}</span>
-        <span className="text-sm font-bold text-gray-900">{fmtVal(total, config.format)}</span>
+      <div className="flex items-center justify-end px-3 pt-1">
+        <span className="text-sm font-bold text-foreground">{fmtVal(total, config.format)}</span>
       </div>
 
       {/* Chart */}
@@ -80,15 +82,15 @@ export function ChartWidget({ config }: { config: WidgetConfig }) {
               <XAxis dataKey="date" tickFormatter={labelFmt} tick={{ fontSize: 9 }} />
               <YAxis tickFormatter={(v) => fmtVal(v, config.format)} tick={{ fontSize: 9 }} width={45} />
               <Tooltip formatter={tooltipFmt} labelFormatter={labelFmt} />
-              <Line type="monotone" dataKey="value" stroke="#BE1E23" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="value" stroke="var(--primary)" strokeWidth={2} dot={false} />
             </LineChart>
           ) : chartType === "bar" ? (
-            <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <BarChart data={data} barCategoryGap="20%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
               <XAxis dataKey="date" tickFormatter={labelFmt} tick={{ fontSize: 9 }} interval={0} angle={isDimensionQuery ? -25 : 0} textAnchor={isDimensionQuery ? "end" : "middle"} height={isDimensionQuery ? 50 : 30} />
               <YAxis tickFormatter={(v) => fmtVal(v, config.format)} tick={{ fontSize: 9 }} width={45} />
-              <Tooltip formatter={tooltipFmt} labelFormatter={labelFmt} />
-              <Bar dataKey="value" fill="#BE1E23" radius={[3, 3, 0, 0]} />
+              <Tooltip formatter={tooltipFmt} labelFormatter={labelFmt} contentStyle={{ borderRadius: "8px", border: "1px solid var(--border)", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }} />
+              <Bar dataKey="value" fill="var(--primary)" radius={[6, 6, 6, 6]} maxBarSize={32} />
             </BarChart>
           ) : chartType === "area" ? (
             <AreaChart data={data}>
@@ -96,7 +98,7 @@ export function ChartWidget({ config }: { config: WidgetConfig }) {
               <XAxis dataKey="date" tickFormatter={labelFmt} tick={{ fontSize: 9 }} />
               <YAxis tickFormatter={(v) => fmtVal(v, config.format)} tick={{ fontSize: 9 }} width={45} />
               <Tooltip formatter={tooltipFmt} labelFormatter={labelFmt} />
-              <Area type="monotone" dataKey="value" stroke="#BE1E23" fill="#BE1E23" fillOpacity={0.12} strokeWidth={2} />
+              <Area type="monotone" dataKey="value" stroke="var(--primary)" fill="var(--primary)" fillOpacity={0.12} strokeWidth={2} />
             </AreaChart>
           ) : (
             <PieChart>

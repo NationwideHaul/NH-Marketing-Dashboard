@@ -50,7 +50,7 @@ const nhPlatforms: PlatformData[] = [
   {
     name: "My Little Salesman",
     fullName: "My Little Salesman",
-    color: "#2563EB",
+    color: "#D97706",
     pricePerMonth: 895,
     billingCycle: "monthly",
     monthlyData: [
@@ -66,7 +66,7 @@ const nhPlatforms: PlatformData[] = [
   {
     name: "Commercial Truck Trader",
     fullName: "Commercial Truck Trader",
-    color: "#16A34A",
+    color: "#DC2626",
     pricePerMonth: 1200,
     billingCycle: "monthly",
     monthlyData: [
@@ -120,7 +120,7 @@ const nhttrPlatforms: PlatformData[] = [
   {
     name: "Find Truck Service",
     fullName: "Find Truck Service",
-    color: "#2563EB",
+    color: "#D97706",
     pricePerMonth: 0,
     billingCycle: "annual",
     annualCost: 996,
@@ -137,7 +137,7 @@ const nhttrPlatforms: PlatformData[] = [
   {
     name: "TruckDown",
     fullName: "TruckDown",
-    color: "#16A34A",
+    color: "#EA580C",
     pricePerMonth: 0,
     billingCycle: "annual",
     annualCost: 430,
@@ -174,7 +174,7 @@ const nfiPlatforms: PlatformData[] = [
   {
     name: "My Little Salesman",
     fullName: "My Little Salesman",
-    color: "#2563EB",
+    color: "#0284C7",
     pricePerMonth: 895,
     billingCycle: "monthly",
     monthlyData: [],
@@ -182,7 +182,7 @@ const nfiPlatforms: PlatformData[] = [
   {
     name: "Commercial Truck Trader",
     fullName: "Commercial Truck Trader",
-    color: "#16A34A",
+    color: "#0891B2",
     pricePerMonth: 1200,
     billingCycle: "monthly",
     monthlyData: [],

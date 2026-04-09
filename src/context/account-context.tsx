@@ -64,6 +64,25 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     ? `${currentAccount.id}-${activeSubService}`
     : currentAccount.id;
 
+  // Sync CSS custom properties with current account brand colors
+  useEffect(() => {
+    const root = document.documentElement;
+    const { primary, secondary, sidebar, accent } = currentAccount.colors;
+    const palette = currentAccount.chartPalette;
+    root.style.setProperty("--primary", primary);
+    root.style.setProperty("--secondary", secondary);
+    root.style.setProperty("--ring", primary);
+    root.style.setProperty("--sidebar-bg", sidebar);
+    root.style.setProperty("--sidebar-accent", accent);
+    root.style.setProperty("--chart-primary", primary);
+    root.style.setProperty("--chart-accent-1", secondary);
+    // Set chart accent palette from account
+    for (let i = 0; i < 6; i++) {
+      root.style.setProperty(`--chart-accent-${i + 1}`, palette[i + 1] || palette[i % palette.length]);
+    }
+    root.style.setProperty("--positive", currentAccount.positiveColor);
+  }, [currentAccount]);
+
   if (!loaded) return null;
 
   return (

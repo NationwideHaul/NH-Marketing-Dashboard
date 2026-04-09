@@ -333,20 +333,20 @@ function FullPlatformView({ platforms }: { platforms: PlatformData[] }) {
       {/* Top Performers */}
       {bestPerformer && worstPerformer && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
-          <div className="rounded-lg border border-green-200 bg-green-50 p-4 flex items-center gap-3">
-            <Award className="h-8 w-8 text-green-600" />
+          <div className="rounded-lg border border-border bg-card p-4 flex items-center gap-3">
+            <Award className="h-8 w-8 text-primary" />
             <div>
-              <p className="text-xs text-green-600 font-medium">Best ROI This Month</p>
-              <p className="text-lg font-bold text-green-800">{bestPerformer.name}</p>
-              <p className="text-xs text-green-600">{formatCurrency(bestPerformer.cpl)} per lead -- {bestPerformer.leads} leads -- ROI Score: {bestPerformer.roiScore}/100</p>
+              <p className="text-xs text-primary font-medium">Best ROI This Month</p>
+              <p className="text-lg font-bold text-foreground">{bestPerformer.name}</p>
+              <p className="text-xs text-muted-foreground">{formatCurrency(bestPerformer.cpl)} per lead -- {bestPerformer.leads} leads -- ROI Score: {bestPerformer.roiScore}/100</p>
             </div>
           </div>
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 flex items-center gap-3">
+          <div className="rounded-lg border border-border bg-card p-4 flex items-center gap-3">
             <AlertTriangle className="h-8 w-8 text-red-500" />
             <div>
               <p className="text-xs text-red-500 font-medium">Highest Cost Per Lead</p>
-              <p className="text-lg font-bold text-red-800">{worstPerformer.name}</p>
-              <p className="text-xs text-red-500">{formatCurrency(worstPerformer.cpl)} per lead -- {worstPerformer.leads} leads -- ROI Score: {worstPerformer.roiScore}/100</p>
+              <p className="text-lg font-bold text-foreground">{worstPerformer.name}</p>
+              <p className="text-xs text-muted-foreground">{formatCurrency(worstPerformer.cpl)} per lead -- {worstPerformer.leads} leads -- ROI Score: {worstPerformer.roiScore}/100</p>
             </div>
           </div>
         </div>
@@ -485,12 +485,12 @@ function FullPlatformView({ platforms }: { platforms: PlatformData[] }) {
               </thead>
               <tbody>
                 {roiRanking.map((s, i) => (
-                  <tr key={s.name} className={`border-b border-border last:border-0 ${i === 0 ? "bg-green-50" : ""}`}>
+                  <tr key={s.name} className={`border-b border-border last:border-0 ${i === 0 ? "bg-primary/5" : ""}`}>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: platforms.find((p) => p.name === s.name)?.color }} />
                         <span className="font-medium text-card-foreground">{s.name}</span>
-                        {i === 0 && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">Best</span>}
+                        {i === 0 && <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">Best</span>}
                       </div>
                     </td>
                     <td className="px-4 py-2.5 text-right">{formatCurrency(s.price)}</td>

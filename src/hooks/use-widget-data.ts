@@ -3,7 +3,7 @@
 import useSWR from "swr";
 import { useDateRange } from "@/context/date-range-context";
 import { useAccount } from "@/context/account-context";
-import { format } from "date-fns";
+import { format, differenceInDays, subDays } from "date-fns";
 import type { WidgetConfig } from "@/types/widget";
 import type { KPIMetric } from "@/types/kpi";
 
@@ -39,7 +39,7 @@ const SWR_CONFIG = {
   shouldRetryOnError: false,
 };
 
-// Main hook — fetches from real API and extracts metric
+// Main hook — fetches from real API and extracts metric, with previous period comparison
 export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
   const { dateRange } = useDateRange();
   const { apiAccountId } = useAccount();
@@ -49,7 +49,18 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
   const sep = route.includes("?") ? "&" : "?";
   const url = `${route}${sep}startDate=${startDate}&endDate=${endDate}&accountId=${apiAccountId}`;
 
+  // Calculate previous period (same duration, immediately before)
+  const days = differenceInDays(dateRange.to, dateRange.from) + 1;
+  const prevEnd = subDays(dateRange.from, 1);
+  const prevStart = subDays(prevEnd, days - 1);
+  const prevUrl = `${route}${sep}startDate=${format(prevStart, "yyyy-MM-dd")}&endDate=${format(prevEnd, "yyyy-MM-dd")}&accountId=${apiAccountId}`;
+
   const { data } = useSWR(url, fetcher, SWR_CONFIG);
+  const { data: prevData } = useSWR(
+    config.comparisonEnabled ? prevUrl : null,
+    fetcher,
+    SWR_CONFIG
+  );
 
   if (!data || data.status === "error") return null;
 
@@ -57,22 +68,39 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
   const metricValue = extractMetric(data, config.metric, config.dataSource);
   if (metricValue === null) return null;
 
+  // Compute trend vs previous period
+  let trend: "up" | "down" | "flat" = "flat";
+  let changePercent = 0;
+
+  if (config.comparisonEnabled && prevData && prevData.status !== "error") {
+    const prevValue = extractMetric(prevData, config.metric, config.dataSource);
+    if (prevValue !== null && prevValue !== 0) {
+      changePercent = ((metricValue - prevValue) / prevValue) * 100;
+      trend = changePercent > 0 ? "up" : changePercent < 0 ? "down" : "flat";
+    }
+  }
+
   return {
     id: config.metric,
     label: config.title,
     value: metricValue,
     format: config.format,
-    trend: "flat",
-    changePercent: 0,
+    trend,
+    changePercent,
   };
 }
 
 // For charts — returns time series from API
+// If config.trendMonths is set, extends the date range back N months for monthly comparisons
 // If config.dimension is set, fetches a separate GA4 query with that dimension
 export function useWidgetTimeSeries(config: WidgetConfig): { date: string; value: number }[] {
   const { dateRange } = useDateRange();
   const { apiAccountId } = useAccount();
-  const startDate = format(dateRange.from, "yyyy-MM-dd");
+  // If trendMonths is set, extend start date back N months from the end date
+  const effectiveStart = config.trendMonths
+    ? subDays(dateRange.to, config.trendMonths * 30)
+    : dateRange.from;
+  const startDate = format(effectiveStart, "yyyy-MM-dd");
   const endDate = format(dateRange.to, "yyyy-MM-dd");
   const route = getApiRoute(config.dataSource);
   const sep = route.includes("?") ? "&" : "?";

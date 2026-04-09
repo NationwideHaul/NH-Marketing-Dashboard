@@ -23,10 +23,10 @@ import { ChartTypeSelector } from "./chart-type-selector";
 import { formatNumber, formatCurrency, formatPercent } from "@/lib/utils";
 import type { ChartType, ChartConfig } from "@/types/chart";
 import type { TimeSeriesPoint } from "@/lib/mock-data";
+import { useAccount } from "@/context/account-context";
 
-const CHART_COLORS = [
-  "#BE1E23", "#8C0F14", "#2563EB", "#16A34A", "#D97706", "#7C3AED", "#DB2777",
-];
+// Fallback — will be overridden by account palette
+const DEFAULT_COLORS = ["#BE1E23", "#8C0F14", "#D97706", "#DC2626", "#EA580C", "#F97316", "#B91C1C"];
 
 interface DashboardChartProps {
   config: ChartConfig;
@@ -51,6 +51,9 @@ function formatXAxis(dateStr: any) {
 }
 
 export function DashboardChart({ config, data, comparisonData }: DashboardChartProps) {
+  const { currentAccount } = useAccount();
+  const CHART_COLORS = currentAccount.chartPalette ?? DEFAULT_COLORS;
+  const primary = currentAccount.colors.primary;
   const [chartType, setChartType] = useState<ChartType>(config.defaultType);
 
   const mergedData = useMemo(() => {
@@ -85,7 +88,7 @@ export function DashboardChart({ config, data, comparisonData }: DashboardChartP
   return (
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-medium text-card-foreground">{config.title}</h3>
+        <h3 className="text-base font-semibold text-card-foreground">{config.title}</h3>
         <ChartTypeSelector
           selected={chartType}
           supported={config.supportedTypes}
@@ -102,21 +105,21 @@ export function DashboardChart({ config, data, comparisonData }: DashboardChartP
               <YAxis tickFormatter={(v) => formatValue(v, config.format)} tick={{ fontSize: 11 }} width={60} />
               <Tooltip formatter={tooltipFormatter} labelFormatter={formatXAxis} />
               {comparisonData && <Legend />}
-              <Line type="monotone" dataKey="current" name="Current" stroke="#BE1E23" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="current" name="Current" stroke={primary} strokeWidth={2} dot={false} />
               {comparisonData && (
                 <Line type="monotone" dataKey="comparison" name="Previous" stroke="#9CA3AF" strokeWidth={2} strokeDasharray="5 5" dot={false} />
               )}
             </LineChart>
           ) : chartType === "bar" ? (
-            <BarChart data={mergedData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+            <BarChart data={mergedData} barCategoryGap="20%">
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
               <XAxis dataKey="date" tickFormatter={formatXAxis} tick={{ fontSize: 11 }} />
               <YAxis tickFormatter={(v) => formatValue(v, config.format)} tick={{ fontSize: 11 }} width={60} />
-              <Tooltip formatter={tooltipFormatter} labelFormatter={formatXAxis} />
+              <Tooltip formatter={tooltipFormatter} labelFormatter={formatXAxis} contentStyle={{ borderRadius: "8px", border: "1px solid var(--border)", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }} />
               {comparisonData && <Legend />}
-              <Bar dataKey="current" name="Current" fill="#BE1E23" radius={[2, 2, 0, 0]} />
+              <Bar dataKey="current" name="Current" fill={primary} radius={[6, 6, 6, 6]} maxBarSize={32} />
               {comparisonData && (
-                <Bar dataKey="comparison" name="Previous" fill="#9CA3AF" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="comparison" name="Previous" fill="#9CA3AF" radius={[6, 6, 6, 6]} maxBarSize={32} />
               )}
             </BarChart>
           ) : chartType === "area" ? (
@@ -126,7 +129,7 @@ export function DashboardChart({ config, data, comparisonData }: DashboardChartP
               <YAxis tickFormatter={(v) => formatValue(v, config.format)} tick={{ fontSize: 11 }} width={60} />
               <Tooltip formatter={tooltipFormatter} labelFormatter={formatXAxis} />
               {comparisonData && <Legend />}
-              <Area type="monotone" dataKey="current" name="Current" stroke="#BE1E23" fill="#BE1E23" fillOpacity={0.15} strokeWidth={2} />
+              <Area type="monotone" dataKey="current" name="Current" stroke={primary} fill={primary} fillOpacity={0.15} strokeWidth={2} />
               {comparisonData && (
                 <Area type="monotone" dataKey="comparison" name="Previous" stroke="#9CA3AF" fill="#9CA3AF" fillOpacity={0.08} strokeWidth={2} strokeDasharray="5 5" />
               )}

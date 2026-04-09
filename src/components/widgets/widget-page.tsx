@@ -4,6 +4,7 @@ import { useCallback, useRef, useState, useEffect } from "react";
 import { ResponsiveGridLayout } from "react-grid-layout";
 import { usePathname } from "next/navigation";
 import { useDashboard } from "@/context/dashboard-context";
+import { useAccount } from "@/context/account-context";
 import { WidgetWrapper } from "./widget-wrapper";
 import { WidgetPicker } from "./widget-picker";
 import { DataSourceBadge } from "@/components/layout/data-source-badge";
@@ -23,7 +24,19 @@ interface WidgetPageProps {
 export function WidgetPage({ title, description, headerContent }: WidgetPageProps) {
   const pathname = usePathname();
   const { widgets, layouts, editMode, showPicker, updateLayouts } = useDashboard();
-  const sources = externalLinks[pathname || "/"] || [];
+  const { currentAccount } = useAccount();
+
+  // Filter external link badges by account's available tabs
+  const sourceToTab: Record<string, string> = {
+    "Meta Ads": "meta-ads", "Meta Ads Manager": "meta-ads",
+    "Google My Business": "gmb", "Google Business Profile": "gmb",
+    "YouTube": "social-media", "Facebook": "social-media", "LinkedIn": "social-media",
+  };
+  const allSources = externalLinks[pathname || "/"] || [];
+  const sources = allSources.filter((s) => {
+    const tab = sourceToTab[s.name];
+    return !tab || currentAccount.tabs.includes(tab);
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1200);
 
@@ -49,11 +62,11 @@ export function WidgetPage({ title, description, headerContent }: WidgetPageProp
   return (
     <div ref={containerRef}>
       {(title || headerContent) && (
-        <div className="mb-4">
+        <div className="mb-6">
           {title && <h2 className="text-lg font-bold text-foreground">{title}</h2>}
           {description && <p className="text-sm text-muted-foreground">{description}</p>}
           {sources.length > 0 && <DataSourceBadge sources={sources} />}
-          {headerContent}
+          {headerContent && <div className="mt-4">{headerContent}</div>}
         </div>
       )}
 
