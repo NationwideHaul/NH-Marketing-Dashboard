@@ -1,12 +1,17 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { ChevronDown, Globe, Check } from "lucide-react";
 import { useAccount } from "@/context/account-context";
 import { cn } from "@/lib/utils";
 
+// Pages where the sub-service toggle should be hidden (general view, not per-property)
+const HIDDEN_PAGES = ["/inventory-platforms", "/call-logs"];
+
 export function SubServiceToggle() {
   const { currentAccount, activeSubService, setActiveSubService } = useAccount();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -19,6 +24,7 @@ export function SubServiceToggle() {
   }, []);
 
   if (!currentAccount.subServices?.length) return null;
+  if (HIDDEN_PAGES.includes(pathname || "")) return null;
 
   const active = currentAccount.subServices.find((s) => s.id === activeSubService) || currentAccount.subServices[0];
 
