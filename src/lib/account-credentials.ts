@@ -2,6 +2,13 @@
 // This file is ONLY used in API routes (server-side)
 // Each account has its own set of API credentials
 
+export interface GMBLocation {
+  id: string;
+  name: string;
+  address: string;
+  verified: boolean;
+}
+
 export interface AccountCredentials {
   ga4PropertyId?: string;
   googleAdsCustomerId?: string;
@@ -15,6 +22,7 @@ export interface AccountCredentials {
   metaIgUserId?: string;
   youtubeChannelId?: string;
   ringcentralEnabled?: boolean;
+  gmbLocations?: GMBLocation[];
 }
 
 const accountCredentials: Record<string, AccountCredentials> = {
@@ -48,6 +56,20 @@ const accountCredentials: Record<string, AccountCredentials> = {
     googleAdsDeveloperToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "NH Repair Shops",
     ringcentralEnabled: true,
+    gmbLocations: [
+      {
+        id: "0871542938401481844",
+        name: "Nationwide Haul - RV & Bus Repair & Service",
+        address: "5021 Frontage Rd N, Suite RV, Lakeland, FL 33810",
+        verified: false,
+      },
+      {
+        id: "16514751471730111176",
+        name: "Nationwide Haul - Truck & Trailer Repair",
+        address: "5021 Frontage Rd N, Suite Shop, Lakeland, FL 33810",
+        verified: true,
+      },
+    ],
   },
   "nhttr-rv": {
     ga4PropertyId: "528221425",
@@ -55,6 +77,14 @@ const accountCredentials: Record<string, AccountCredentials> = {
     googleAdsDeveloperToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "NH Repair Shops",
     ringcentralEnabled: true,
+    gmbLocations: [
+      {
+        id: "0871542938401481844",
+        name: "Nationwide Haul - RV & Bus Repair & Service",
+        address: "5021 Frontage Rd N, Suite RV, Lakeland, FL 33810",
+        verified: false,
+      },
+    ],
   },
   "nhttr-ttr": {
     ga4PropertyId: "528269534",
@@ -62,6 +92,14 @@ const accountCredentials: Record<string, AccountCredentials> = {
     googleAdsDeveloperToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "NH Repair Shops",
     ringcentralEnabled: true,
+    gmbLocations: [
+      {
+        id: "16514751471730111176",
+        name: "Nationwide Haul - Truck & Trailer Repair",
+        address: "5021 Frontage Rd N, Suite Shop, Lakeland, FL 33810",
+        verified: true,
+      },
+    ],
   },
   "road-ready": {
     // TBD — no credentials yet

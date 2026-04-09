@@ -1,3 +1,10 @@
+export interface GMBLocationInfo {
+  id: string;
+  name: string;
+  address: string;
+  verified: boolean;
+}
+
 export interface SubAccount {
   id: string;
   name: string;
@@ -20,6 +27,7 @@ export interface SubAccount {
   };
   inventoryPlatforms?: string[]; // Which inventory platforms this account uses
   subServices?: { id: string; name: string; ga4PropertyId: string; googleAdsCustomerId: string; website: string }[];
+  gmbLocations?: GMBLocationInfo[];
 }
 
 export const accounts: SubAccount[] = [
@@ -97,6 +105,20 @@ export const accounts: SubAccount[] = [
       { id: "ttr", name: "Truck & Trailer Repair", ga4PropertyId: "528269534", googleAdsCustomerId: "6515085474", website: "nhtrucktrailerrepair.com" },
     ],
     inventoryPlatforms: ["NTTS", "Find Truck Service", "TruckDown"],
+    gmbLocations: [
+      {
+        id: "0871542938401481844",
+        name: "Nationwide Haul - RV & Bus Repair & Service",
+        address: "5021 Frontage Rd N, Suite RV, Lakeland, FL 33810",
+        verified: false,
+      },
+      {
+        id: "16514751471730111176",
+        name: "Nationwide Haul - Truck & Trailer Repair",
+        address: "5021 Frontage Rd N, Suite Shop, Lakeland, FL 33810",
+        verified: true,
+      },
+    ],
   },
   {
     id: "road-ready",
