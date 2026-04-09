@@ -25,7 +25,7 @@ function StatCard({ icon: Icon, label, value, subtitle, color = "text-card-foreg
         <Icon className="h-4 w-4 text-muted-foreground" />
         <span className="text-xs text-muted-foreground">{label}</span>
       </div>
-      <p className="text-2xl font-bold" style={colorHex ? { color: colorHex } : undefined} {...(!colorHex ? { className: `text-2xl font-bold ${color}` } : {})}>{value}</p>
+      <p className={`text-2xl font-bold ${!colorHex ? color : ''}`} style={colorHex ? { color: colorHex } : undefined}>{value}</p>
       {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
     </div>
   );
