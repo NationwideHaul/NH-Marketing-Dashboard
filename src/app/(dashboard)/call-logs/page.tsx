@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import {
   ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, AreaChart, Area,
+  PieLabelRenderProps,
 } from "recharts";
 import { Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing, Clock, TrendingUp, Users, ChevronDown, Check } from "lucide-react";
 import { useDateRange } from "@/context/date-range-context";
@@ -181,7 +182,7 @@ function AgentCallsTab() {
                     { name: "Outbound", value: totalOutbound, fill: primary },
                   ]}
                   cx="50%" cy="50%" innerRadius="40%" outerRadius="65%" paddingAngle={3} dataKey="value"
-                  label={({ name, percent }: any) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                  label={({ name, percent }: PieLabelRenderProps) => `${name ?? ''} ${(((percent as number) ?? 0) * 100).toFixed(0)}%`}
                 >
                   <Cell fill={positiveColor} />
                   <Cell fill={primary} />
