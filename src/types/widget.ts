@@ -25,7 +25,8 @@ export type DataSource =
   | "ringcentral"
   | "gmb"
   | "linkedin"
-  | "overview";
+  | "overview"
+  | "nationwide-haul-crm";
 
 export interface WidgetConfig {
   id: string;

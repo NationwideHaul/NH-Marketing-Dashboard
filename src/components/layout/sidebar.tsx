@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import {
   LayoutDashboard, BarChart3, DollarSign, MapPin, Share2,
   PhoneCall, Megaphone, Layers, Mail, Wallet, TrendingUp, Link2, ChevronDown, Check,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, Database,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAccount } from "@/context/account-context";
@@ -14,7 +14,7 @@ import { allTabs } from "@/lib/accounts";
 
 const iconMap: Record<string, any> = { // eslint-disable-line @typescript-eslint/no-explicit-any
   LayoutDashboard, BarChart3, DollarSign, MapPin, Share2,
-  PhoneCall, Megaphone, Layers, Mail, Wallet, TrendingUp, Link2,
+  PhoneCall, Megaphone, Layers, Mail, Wallet, TrendingUp, Link2, Database,
 };
 
 const STORAGE_KEY = "nh-sidebar-collapsed";

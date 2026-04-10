@@ -22,6 +22,7 @@ function getApiRoute(dataSource: string): string {
     "gmb": "/api/gmb",
     "linkedin": "/api/linkedin",
     "overview": "/api/google-analytics", // default
+    "nationwide-haul-crm": "/api/nationwide-haul-crm",
   };
   return routes[dataSource] || "/api/google-analytics";
 }
@@ -157,6 +158,19 @@ function extractMetric(apiResponse: any, metric: string, dataSource: string): nu
     return null;
   }
 
+  // Nationwide Haul CRM format (nested summary response)
+  if (dataSource === "nationwide-haul-crm") {
+    if (d[metric] !== undefined) return d[metric];
+    if (d.leads && d.leads[metric] !== undefined) return d.leads[metric];
+    if (d.deals && d.deals[metric] !== undefined) return d.deals[metric];
+    if (d.funnel && d.funnel[metric] !== undefined) return d.funnel[metric];
+    // Aliases: totalLeads → leads.total, closeRate → deals.closeRate
+    if (metric === "totalLeads") return d.leads?.total ?? null;
+    if (metric === "closeRate") return d.deals?.closeRate ?? null;
+    if (metric === "closedDeals") return d.funnel?.closedDeals ?? null;
+    return null;
+  }
+
   // CallRail format
   if (dataSource === "callrail" && d[metric] !== undefined) return d[metric];
 
@@ -199,6 +213,14 @@ function extractMetric(apiResponse: any, metric: string, dataSource: string): nu
 function extractTimeSeries(apiResponse: any, metric: string): { date: string; value: number }[] | null { // eslint-disable-line @typescript-eslint/no-explicit-any
   const d = apiResponse.data;
   if (!d) return null;
+
+  // Nationwide Haul CRM: leads or deals time series
+  if (apiResponse.platform === "nationwide-haul-crm") {
+    if (metric === "totalRevenue" || metric === "closedWon" || metric === "avgDealValue") {
+      return d.deals?.timeSeries ?? d.timeSeries ?? null;
+    }
+    return d.leads?.timeSeries ?? d.timeSeries ?? null;
+  }
 
   // CallRail: extract from calls array by date
   if (apiResponse.platform === "callrail" && d.calls) {

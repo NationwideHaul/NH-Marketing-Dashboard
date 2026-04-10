@@ -214,6 +214,21 @@ export const dataSources: DataSourceOption[] = [
       { key: "costEfficiency", label: "Cost Efficiency", format: "percent", category: "Efficiency" },
     ],
   },
+  {
+    key: "nationwide-haul-crm" as const,
+    label: "CRM Leads & Revenue",
+    icon: "CRM",
+    metrics: [
+      { key: "totalLeads", label: "Total Leads", format: "number" as const, category: "Funnel" },
+      { key: "closedWon", label: "Closed Won", format: "number" as const, category: "Sales" },
+      { key: "totalRevenue", label: "Total Revenue", format: "currency" as const, category: "Revenue" },
+      { key: "avgDealValue", label: "Avg Deal Value", format: "currency" as const, category: "Revenue" },
+      { key: "closeRate", label: "Close Rate", format: "percent" as const, category: "Performance" },
+      { key: "mql", label: "MQLs", format: "number" as const, category: "Funnel" },
+      { key: "sql", label: "SQLs", format: "number" as const, category: "Funnel" },
+      { key: "closedDeals", label: "Closed Deals", format: "number" as const, category: "Funnel" },
+    ],
+  },
 ];
 
 export function getDataSource(key: string) {
