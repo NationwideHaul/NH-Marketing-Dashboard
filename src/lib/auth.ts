@@ -82,8 +82,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, account }) {
-      // On initial sign-in, save all tokens
-      if (account) {
+      // On initial sign-in with Google, save all tokens
+      if (account && account.provider === "google") {
+        // Log the refresh token so it can be captured
+        if (account.refresh_token) {
+          console.log("=== GOOGLE REFRESH TOKEN (save as GOOGLE_REFRESH_TOKEN env var) ===");
+          console.log(account.refresh_token);
+          console.log("=== END TOKEN ===");
+        }
         return {
           ...token,
           accessToken: account.access_token,
