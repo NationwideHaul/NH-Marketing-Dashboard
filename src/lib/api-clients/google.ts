@@ -11,7 +11,51 @@ function getOAuth2Client() {
   return oauth2Client;
 }
 
-// Set credentials from session token
+// Get a fresh access token using the stored refresh token (no user session needed)
+let cachedAccessToken: string | null = null;
+let cachedTokenExpiry = 0;
+
+export async function getStoredGoogleClient() {
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+  if (!refreshToken) {
+    throw new Error("GOOGLE_REFRESH_TOKEN not set. Connect Google once to get it.");
+  }
+
+  const now = Date.now() / 1000;
+
+  // Return cached token if still valid (with 60s buffer)
+  if (cachedAccessToken && cachedTokenExpiry > now + 60) {
+    const client = getOAuth2Client();
+    client.setCredentials({ access_token: cachedAccessToken, refresh_token: refreshToken });
+    return { client, accessToken: cachedAccessToken };
+  }
+
+  // Refresh the token
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID || "",
+      client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(`Token refresh failed: ${data.error_description || data.error}`);
+  }
+
+  cachedAccessToken = data.access_token;
+  cachedTokenExpiry = now + (data.expires_in || 3600);
+
+  const client = getOAuth2Client();
+  client.setCredentials({ access_token: cachedAccessToken, refresh_token: refreshToken });
+  return { client, accessToken: cachedAccessToken! };
+}
+
+// Set credentials from session token (legacy - kept for backwards compatibility)
 export function getAuthenticatedClient(accessToken: string, refreshToken?: string) {
   const client = getOAuth2Client();
   client.setCredentials({

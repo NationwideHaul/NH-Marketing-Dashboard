@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { getYouTubeAnalytics, getYouTubeTopVideos, getYouTubeTrafficSources } from "@/lib/api-clients/google";
+import { getYouTubeAnalytics, getYouTubeTopVideos, getYouTubeTrafficSources, getStoredGoogleClient } from "@/lib/api-clients/google";
 import { getAccountCredentials } from "@/lib/account-credentials";
 
 export async function GET(request: NextRequest) {
@@ -18,16 +17,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const session = await auth();
-    if (!session?.accessToken) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
+    const { accessToken } = await getStoredGoogleClient();
+    const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
 
-    const refreshToken = (session as any).refreshToken; // eslint-disable-line @typescript-eslint/no-explicit-any
     let data;
-    if (type === "top-videos") data = await getYouTubeTopVideos(session.accessToken, refreshToken, channelId, startDate, endDate);
-    else if (type === "traffic") data = await getYouTubeTrafficSources(session.accessToken, refreshToken, channelId, startDate, endDate);
-    else data = await getYouTubeAnalytics(session.accessToken, refreshToken, channelId, startDate, endDate);
+    if (type === "top-videos") data = await getYouTubeTopVideos(accessToken, refreshToken, channelId, startDate, endDate);
+    else if (type === "traffic") data = await getYouTubeTrafficSources(accessToken, refreshToken, channelId, startDate, endDate);
+    else data = await getYouTubeAnalytics(accessToken, refreshToken, channelId, startDate, endDate);
 
     return NextResponse.json({ platform: "youtube", status: "live", accountId, data });
   } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any

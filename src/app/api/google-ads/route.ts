@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { getGoogleAdsData } from "@/lib/api-clients/google";
+import { getGoogleAdsData, getStoredGoogleClient } from "@/lib/api-clients/google";
 import { getAccountCredentials } from "@/lib/account-credentials";
 
 export async function GET(request: NextRequest) {
@@ -21,17 +20,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const session = await auth();
-    if (!session?.accessToken) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
+    const { accessToken } = await getStoredGoogleClient();
 
-    const data = await getGoogleAdsData(session.accessToken, (session as any).refreshToken, customerId, startDate, endDate); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const data = await getGoogleAdsData(accessToken, process.env.GOOGLE_REFRESH_TOKEN, customerId, startDate, endDate);
     return NextResponse.json({ platform: "google-ads", status: "live", accountId, data });
   } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
     return NextResponse.json({
       platform: "google-ads", status: "error", error: error.message,
-      debug: { customerId, managerId: process.env.GOOGLE_ADS_MANAGER_ID || "NOT SET", devToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN ? "SET" : "NOT SET" }
     }, { status: 500 });
   }
 }
