@@ -3,7 +3,7 @@
 import useSWR from "swr";
 import { format } from "date-fns";
 import {
-  ResponsiveContainer, AreaChart, Area, BarChart, Bar,
+  ResponsiveContainer, AreaChart, Area, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
 import { TrendingUp, TrendingDown, Users, DollarSign, Target, Award } from "lucide-react";
@@ -243,7 +243,7 @@ export default function CRMLeadsPage() {
                       />
                       <Bar dataKey="count" name="Leads" radius={[0, 6, 6, 0]} maxBarSize={20}>
                         {bySourceData.map((_, i) => (
-                          <rect key={i} fill={COLORS[i % COLORS.length]} />
+                          <Cell key={i} fill={COLORS[i % COLORS.length]} />
                         ))}
                       </Bar>
                     </BarChart>
