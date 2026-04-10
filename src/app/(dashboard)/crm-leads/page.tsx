@@ -67,7 +67,7 @@ function StatCard({
         </p>
         {subtext && <p className="text-xs text-muted-foreground mt-0.5">{subtext}</p>}
       </div>
-      {changePercent !== undefined && (
+      {changePercent != null && (
         <div className={`flex items-center gap-1 text-xs font-medium ${trendUp ? "text-green-600" : trendDown ? "text-red-500" : "text-muted-foreground"}`}>
           {trendUp ? <TrendingUp className="h-3 w-3" /> : trendDown ? <TrendingDown className="h-3 w-3" /> : null}
           {changePercent > 0 ? "+" : ""}{changePercent.toFixed(1)}% vs prior period
@@ -157,7 +157,7 @@ export default function CRMLeadsPage() {
             <StatCard
               label="Total Leads"
               value={leads?.total ?? null}
-              changePercent={leads?.changePercent}
+              changePercent={leads?.changePercent ?? undefined}
               icon={Users}
               format="number"
               accentColor={primary}
@@ -174,7 +174,7 @@ export default function CRMLeadsPage() {
             <StatCard
               label="Revenue"
               value={deals?.totalRevenue ?? null}
-              changePercent={deals?.revenueChangePercent}
+              changePercent={deals?.revenueChangePercent ?? undefined}
               icon={DollarSign}
               format="currency"
             />
