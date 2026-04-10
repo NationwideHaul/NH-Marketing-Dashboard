@@ -1,6 +1,12 @@
 // Account-specific inventory platform configurations
 // NH = sales platforms with monthly data from Google Sheet
 // NHTTR = breakdown/service listing platforms with annual budgets
+//
+// TODO: The `calls` and `infoSubmits` fields in nhPlatforms monthlyData are currently
+// hardcoded. Going forward these should be sourced from the Nationwide Haul CRM API
+// via GET /api/nationwide-haul-crm?metric=leads (getCRMLeadMetrics) which provides
+// lead counts broken down by source. Replace static monthlyData with live CRM data
+// once the NH_CRM_API_KEY env var is configured and the data shape is validated.
 
 export interface PlatformData {
   name: string;
