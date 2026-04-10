@@ -11,7 +11,18 @@ import { useDateRange } from "@/context/date-range-context";
 import { useAccount } from "@/context/account-context";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = (url: string) =>
+  fetch(url)
+    .then(async (r) => {
+      const text = await r.text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        // API returned HTML (likely still deploying or route error)
+        return { status: "error", error: `API not ready (HTTP ${r.status}). Vercel may still be deploying — try refreshing in 30 seconds.` };
+      }
+    })
+    .catch((err: Error) => ({ status: "error", error: err.message }));
 
 function StatCard({
   label,
@@ -91,10 +102,10 @@ export default function CRMLeadsPage() {
   const startDate = format(dateRange.from, "yyyy-MM-dd");
   const endDate = format(dateRange.to, "yyyy-MM-dd");
 
-  const { data, isLoading } = useSWR(
+  const { data, isLoading, error: swrError } = useSWR(
     `/api/nationwide-haul-crm?startDate=${startDate}&endDate=${endDate}&accountId=${apiAccountId}`,
     fetcher,
-    { refreshInterval: 300000, revalidateOnFocus: false }
+    { refreshInterval: 30000, revalidateOnFocus: true }
   );
 
   const summary = data?.data;
@@ -132,9 +143,10 @@ export default function CRMLeadsPage() {
         </div>
       )}
 
-      {!isLoading && data?.status === "error" && (
+      {!isLoading && (swrError || data?.status === "error") && (
         <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
-          <p className="text-sm">{data?.error || "Unable to load CRM data. Check NH_CRM_API_KEY."}</p>
+          <p className="text-sm font-medium mb-1">Unable to load CRM data</p>
+          <p className="text-xs">{data?.error || swrError?.message || "Check NH_CRM_API_KEY on Vercel and ensure the deployment is complete."}</p>
         </div>
       )}
 
