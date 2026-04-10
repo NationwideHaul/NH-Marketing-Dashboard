@@ -47,7 +47,7 @@ export const overviewDefaults: PageDefault = {
 export const gaDefaults: PageDefault = {
   widgets: [
     // Row 1: Traffic stats
-    { id: "ga-1", type: "stat", title: "Monthly Visits", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true },
+    { id: "ga-1", type: "stat", title: "Total Traffic", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true },
     { id: "ga-2", type: "stat", title: "Unique Visitors", dataSource: "google-analytics", metric: "users", format: "number", comparisonEnabled: true },
     { id: "ga-3", type: "stat", title: "Page Views", dataSource: "google-analytics", metric: "pageViews", format: "number", comparisonEnabled: true },
     { id: "ga-4", type: "stat", title: "Bounce Rate", dataSource: "google-analytics", metric: "bounceRate", format: "percent", comparisonEnabled: true },
