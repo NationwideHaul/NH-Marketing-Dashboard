@@ -178,7 +178,7 @@ export const accounts: SubAccount[] = [
     ],
     website: "roadreadyinsurance.com",
     config: {
-      ga4PropertyId: "RRI-GA4",
+      ga4PropertyId: "350112166",
       ghlLocationId: "RRI-GHL",
       metaAdAccountId: "RRI-META",
     },

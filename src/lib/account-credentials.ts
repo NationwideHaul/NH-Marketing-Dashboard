@@ -102,7 +102,7 @@ const accountCredentials: Record<string, AccountCredentials> = {
     ],
   },
   "road-ready": {
-    // TBD — no credentials yet
+    ga4PropertyId: "350112166",
   },
 };
 
