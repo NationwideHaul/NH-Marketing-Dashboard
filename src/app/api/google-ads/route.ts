@@ -29,6 +29,9 @@ export async function GET(request: NextRequest) {
     const data = await getGoogleAdsData(session.accessToken, (session as any).refreshToken, customerId, startDate, endDate); // eslint-disable-line @typescript-eslint/no-explicit-any
     return NextResponse.json({ platform: "google-ads", status: "live", accountId, data });
   } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-    return NextResponse.json({ platform: "google-ads", status: "error", error: error.message }, { status: 500 });
+    return NextResponse.json({
+      platform: "google-ads", status: "error", error: error.message,
+      debug: { customerId, managerId: process.env.GOOGLE_ADS_MANAGER_ID || "NOT SET", devToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN ? "SET" : "NOT SET" }
+    }, { status: 500 });
   }
 }
