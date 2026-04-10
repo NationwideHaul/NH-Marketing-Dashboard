@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
+import Credentials from "next-auth/providers/credentials";
 
 async function refreshAccessToken(token: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
   try {
@@ -36,7 +37,28 @@ async function refreshAccessToken(token: any) { // eslint-disable-line @typescri
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
+  pages: {
+    signIn: "/login",
+  },
   providers: [
+    Credentials({
+      name: "Email",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const email = credentials?.email as string;
+        const password = credentials?.password as string;
+        if (
+          email === process.env.DASHBOARD_EMAIL &&
+          password === process.env.DASHBOARD_PASSWORD
+        ) {
+          return { id: "1", name: "NH Marketing", email };
+        }
+        return null;
+      },
+    }),
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
