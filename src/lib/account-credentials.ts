@@ -103,6 +103,8 @@ const accountCredentials: Record<string, AccountCredentials> = {
   },
   "road-ready": {
     ga4PropertyId: "350112166",
+    googleAdsCustomerId: "1866416925",
+    googleAdsDeveloperToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
   },
 };
 

@@ -89,13 +89,21 @@ export async function getGoogleAdsData(
     ORDER BY segments.date ASC
   `;
 
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    "developer-token": process.env.GOOGLE_ADS_DEVELOPER_TOKEN || "",
+    "Content-Type": "application/json",
+  };
+
+  // MCC (Manager Account) ID is required when accessing sub-accounts
+  const managerId = process.env.GOOGLE_ADS_MANAGER_ID;
+  if (managerId) {
+    headers["login-customer-id"] = managerId;
+  }
+
   const response = await fetch(url, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "developer-token": process.env.GOOGLE_ADS_DEVELOPER_TOKEN || "",
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify({ query }),
   });
 
