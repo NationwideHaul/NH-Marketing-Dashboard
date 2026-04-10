@@ -107,7 +107,13 @@ export async function getGoogleAdsData(
     body: JSON.stringify({ query }),
   });
 
-  return response.json();
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    // API returned non-JSON (likely HTML error page)
+    throw new Error(`Google Ads API error (${response.status}): ${text.substring(0, 500)}`);
+  }
 }
 
 // ========== GOOGLE MY BUSINESS ==========
