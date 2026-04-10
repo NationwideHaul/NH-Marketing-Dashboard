@@ -73,7 +73,7 @@ export async function getGoogleAdsData(
   const auth = getAuthenticatedClient(accessToken, refreshToken);
 
   // Google Ads API uses REST
-  const url = `https://googleads.googleapis.com/v17/customers/${customerId}/googleAds:searchStream`;
+  const url = `https://googleads.googleapis.com/v19/customers/${customerId}/googleAds:searchStream`;
 
   const query = `
     SELECT
