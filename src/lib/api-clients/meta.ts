@@ -115,7 +115,7 @@ export async function getMetaAdsCampaigns(
   until: string
 ) {
   const fields = "campaign_name,impressions,clicks,spend,cpc,ctr,actions,reach";
-  const timeRange = JSON.stringify({ since, until });
+  const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
 
   const url = `${META_BASE_URL}/${adAccountId}/insights?fields=${fields}&time_range=${timeRange}&level=campaign&access_token=${accessToken}&limit=50`;
 
@@ -133,7 +133,7 @@ export async function getMetaAdsAccountInsights(
   until: string
 ) {
   const fields = "impressions,clicks,spend,cpc,ctr,reach,actions,cost_per_action_type";
-  const timeRange = JSON.stringify({ since, until });
+  const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
 
   const url = `${META_BASE_URL}/${adAccountId}/insights?fields=${fields}&time_range=${timeRange}&time_increment=1&access_token=${accessToken}`;
 
