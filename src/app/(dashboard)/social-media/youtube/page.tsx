@@ -24,19 +24,10 @@ function YouTubeBanner() {
   );
 
   const d = data?.data;
-  const allVideos: any[] = d?.videos ?? []; // eslint-disable-line @typescript-eslint/no-explicit-any
-
-  // Filter videos published inside the selected date range
-  const from = dateRange.from.getTime();
-  const to = dateRange.to.getTime();
-  const rangeVideos = allVideos.filter((v) => {
-    if (!v.publishedAt) return false;
-    const t = new Date(v.publishedAt).getTime();
-    return t >= from && t <= to;
-  });
-
-  const rangeViews = rangeVideos.reduce((s, v) => s + (v.views || 0), 0);
+  const rangeVideos: any[] = d?.inRangeVideos ?? []; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const rangeViews = d?.views ?? 0;
   const hasRangeVideos = rangeVideos.length > 0;
+  const analyticsAvailable = !!d?.analyticsAvailable;
 
   // Chart data — prefer analytics daily rows if present, else aggregate by week
   let chart: { date: string; value: number }[] = [];
@@ -63,16 +54,22 @@ function YouTubeBanner() {
     <div className="mb-4 rounded-xl border border-border bg-card overflow-hidden">
       <div className="p-5">
         <p className="text-sm text-muted-foreground mb-1">
-          {hasRangeVideos ? "Videos published in this period got" : "Your channel has"}
+          {analyticsAvailable
+            ? "Your channel got"
+            : hasRangeVideos
+              ? "Videos published in this period got"
+              : "Your channel has (all-time)"}
         </p>
         <div className="flex items-baseline gap-2 mb-1">
           <span className="text-4xl font-bold text-foreground">
-            {formatNumber(hasRangeVideos ? rangeViews : d?.totalViews || 0)} views
+            {formatNumber(rangeViews || d?.totalViews || 0)} views
           </span>
           <span className="text-sm text-muted-foreground">
-            {hasRangeVideos
-              ? `from ${rangeVideos.length} video${rangeVideos.length === 1 ? "" : "s"} in the last ${days} days`
-              : `all-time (no videos published in the last ${days} days)`}
+            {analyticsAvailable
+              ? `in the last ${days} days`
+              : hasRangeVideos
+                ? `from ${rangeVideos.length} video${rangeVideos.length === 1 ? "" : "s"} published in the last ${days} days`
+                : `(no videos published in the last ${days} days)`}
           </span>
         </div>
       </div>

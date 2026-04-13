@@ -189,18 +189,10 @@ function extractMetric(apiResponse: any, metric: string, dataSource: string): nu
   // RingCentral format
   if (dataSource === "ringcentral" && d[metric] !== undefined) return d[metric];
 
-  // YouTube format (channel stats + videos[])
+  // YouTube format — the API already returns range-scoped views/likes/
+  // comments/subscribers/watchTime, with all-time totals under totalX.
   if (apiResponse.platform === "youtube") {
-    if (metric === "watchTime" || metric === "estimatedMinutesWatched") {
-      // Only available from Analytics API; return 0 when unavailable
-      return 0;
-    }
     if (d[metric] !== undefined) return d[metric];
-    // Aliases
-    if (metric === "views") return d.totalViews ?? d.views ?? 0;
-    if (metric === "likes") return d.totalLikes ?? 0;
-    if (metric === "comments") return d.totalComments ?? 0;
-    if (metric === "videosPublished") return d.videoCount ?? d.videosPublished ?? 0;
     return null;
   }
 
