@@ -139,7 +139,7 @@ export async function getMetaAdsAccountInsights(
 
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Meta Ads API error: ${response.status}`);
+    throw new Error(`Meta Ads API error: ${response.status} ${await response.text()}`);
   }
   return response.json();
 }
