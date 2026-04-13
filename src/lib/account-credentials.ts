@@ -2,6 +2,15 @@
 // This file is ONLY used in API routes (server-side)
 // Each account has its own set of API credentials
 
+// Read env var and strip whitespace (newlines, tabs, spaces) that
+// commonly slip in when pasting secrets into the Vercel UI.
+const env = new Proxy({} as Record<string, string | undefined>, {
+  get: (_, key: string) => {
+    const v = process.env[key];
+    return typeof v === "string" ? v.trim() : v;
+  },
+});
+
 export interface GMBLocation {
   id: string;
   name: string;
@@ -29,31 +38,31 @@ const accountCredentials: Record<string, AccountCredentials> = {
   "nationwide-haul": {
     ga4PropertyId: "333711970",
     googleAdsCustomerId: "4504773990",
-    googleAdsDeveloperToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "Nationwide Haul",
-    ghlLocationId: process.env.GHL_LOCATION_ID || "IEs4Gwg925sPu0AYNpdS",
-    ghlApiKey: process.env.GHL_API_KEY,
-    metaAdAccountId: process.env.META_AD_ACCOUNT_ID,
-    metaAccessToken: process.env.META_ACCESS_TOKEN,
-    metaPageId: process.env.META_PAGE_ID,
-    metaIgUserId: process.env.META_IG_USER_ID,
+    ghlLocationId: env.GHL_LOCATION_ID || "IEs4Gwg925sPu0AYNpdS",
+    ghlApiKey: env.GHL_API_KEY,
+    metaAdAccountId: env.META_AD_ACCOUNT_ID,
+    metaAccessToken: env.META_ACCESS_TOKEN,
+    metaPageId: env.META_PAGE_ID,
+    metaIgUserId: env.META_IG_USER_ID,
     youtubeChannelId: "UCjWMfLksDwfwVA-u3xkhnhg",
     ringcentralEnabled: true,
   },
   "nfi-truck-sales": {
     ga4PropertyId: "354503352",
     googleAdsCustomerId: "4307362539",
-    googleAdsDeveloperToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "NFI Truck Sales",
     ghlLocationId: "bQFOVHhca9fD7V3faeS1",
-    ghlApiKey: process.env.GHL_API_KEY, // Same agency key, different location
+    ghlApiKey: env.GHL_API_KEY, // Same agency key, different location
     ringcentralEnabled: true,
   },
   "nhttr": {
     // Default to RV — toggle handled by subService param
     ga4PropertyId: "528221425",
     googleAdsCustomerId: "1073209892",
-    googleAdsDeveloperToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "NH Repair Shops",
     ringcentralEnabled: true,
     gmbLocations: [
@@ -74,7 +83,7 @@ const accountCredentials: Record<string, AccountCredentials> = {
   "nhttr-rv": {
     ga4PropertyId: "528221425",
     googleAdsCustomerId: "1073209892",
-    googleAdsDeveloperToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "NH Repair Shops",
     ringcentralEnabled: true,
     gmbLocations: [
@@ -89,7 +98,7 @@ const accountCredentials: Record<string, AccountCredentials> = {
   "nhttr-ttr": {
     ga4PropertyId: "528269534",
     googleAdsCustomerId: "6515085474",
-    googleAdsDeveloperToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "NH Repair Shops",
     ringcentralEnabled: true,
     gmbLocations: [
@@ -104,7 +113,7 @@ const accountCredentials: Record<string, AccountCredentials> = {
   "road-ready": {
     ga4PropertyId: "350112166",
     googleAdsCustomerId: "1866416925",
-    googleAdsDeveloperToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
   },
 };
 
