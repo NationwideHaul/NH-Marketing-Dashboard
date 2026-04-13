@@ -1,29 +1,27 @@
 import { NextResponse } from "next/server";
+import { getStoredGoogleClient } from "@/lib/api-clients/google";
 
-// TEMPORARY: Reproduce the Meta Ads call and return the URL + response
+// TEMPORARY: diagnose YouTube ownership
 export async function GET() {
-  const tok = (process.env.META_ACCESS_TOKEN || "").trim();
-  const acct = (process.env.META_AD_ACCOUNT_ID || "").trim();
-  const since = "2026-03-14";
-  const until = "2026-04-13";
-  const fields = "impressions,clicks,spend,cpc,ctr,reach,actions,cost_per_action_type";
-  const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
-  const url = `https://graph.facebook.com/v21.0/${acct}/insights?fields=${fields}&time_range=${timeRange}&time_increment=1&access_token=${tok}`;
-
-  let apiResponse = "";
   try {
-    const r = await fetch(url);
-    apiResponse = `${r.status} ${(await r.text()).slice(0, 500)}`;
+    const { accessToken } = await getStoredGoogleClient();
+    // 1. Which Google user is the token for?
+    const meRes = await fetch(
+      `https://www.googleapis.com/oauth2/v2/userinfo?access_token=${accessToken}`
+    );
+    const me = await meRes.json();
+    // 2. Which YT channels does this user OWN / MANAGE?
+    const chRes = await fetch(
+      "https://www.googleapis.com/youtube/v3/channels?part=id,snippet,contentDetails&mine=true",
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const channels = await chRes.json();
+    return NextResponse.json({
+      google_user: me,
+      my_channels: channels,
+      configured_channel_id: "UCjWMfLksDwfwVA-u3xkhnhg",
+    });
   } catch (e: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-    apiResponse = `fetch threw: ${e.message}`;
+    return NextResponse.json({ error: e.message });
   }
-
-  return NextResponse.json({
-    urlWithoutToken: url.replace(tok, "TOKEN"),
-    urlLength: url.length,
-    tokenLen: tok.length,
-    acctValue: acct,
-    acctCharCodes: Array.from(acct).map((c) => c.charCodeAt(0)),
-    apiResponse,
-  });
 }
