@@ -3,7 +3,7 @@
 import useSWR from "swr";
 import { useDateRange } from "@/context/date-range-context";
 import { useAccount } from "@/context/account-context";
-import { format, differenceInDays, subDays } from "date-fns";
+import { format, differenceInDays, subDays, subMonths } from "date-fns";
 import type { WidgetConfig } from "@/types/widget";
 import type { KPIMetric } from "@/types/kpi";
 
@@ -97,10 +97,16 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
 export function useWidgetTimeSeries(config: WidgetConfig): { date: string; value: number }[] {
   const { dateRange } = useDateRange();
   const { apiAccountId } = useAccount();
-  // If trendMonths is set, extend start date back N months from the end date
+  // Time-series charts default to 6 months so trends are readable.
+  // Dimension-based charts (e.g. Users by Channel) stay scoped to the selected date range.
+  const isTimeSeriesChart =
+    (config.type === "line-chart" || config.type === "area-chart" || config.type === "bar-chart") &&
+    !config.dimension;
   const effectiveStart = config.trendMonths
     ? subDays(dateRange.to, config.trendMonths * 30)
-    : dateRange.from;
+    : isTimeSeriesChart
+      ? subMonths(dateRange.to, 6)
+      : dateRange.from;
   const startDate = format(effectiveStart, "yyyy-MM-dd");
   const endDate = format(dateRange.to, "yyyy-MM-dd");
   const route = getApiRoute(config.dataSource);
