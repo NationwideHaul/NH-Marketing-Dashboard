@@ -1,83 +1,27 @@
 "use client";
 
-import { Target, Eye, MousePointerClick, DollarSign, Users, TrendingUp, TrendingDown, Image } from "lucide-react";
-import { formatNumber, formatCurrency, formatPercent } from "@/lib/utils";
+import useSWR from "swr";
+import { Target, MousePointerClick, TrendingUp, TrendingDown, Image as ImageIcon } from "lucide-react"; // eslint-disable-line @typescript-eslint/no-unused-vars
+import { format } from "date-fns";
+import { formatNumber, formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { useDateRange } from "@/context/date-range-context";
+import { useAccount } from "@/context/account-context";
 import type { WidgetConfig } from "@/types/widget";
 
-// Mock data -- will be replaced by real Meta Ads API data (campaigns endpoint)
-const activeAds = [
-  {
-    name: "VOLVO Sleepers — Lookalike Audience",
-    status: "Active",
-    objective: "Lead Generation",
-    adText: "Looking for a reliable sleeper truck? Nationwide Haul has the best selection of VOLVO sleepers in FL. Financing available. Call today!",
-    spend: 1247.50,
-    impressions: 45200,
-    clicks: 1645,
-    ctr: 3.64,
-    cpc: 0.76,
-    leads: 23,
-    costPerLead: 54.24,
-    trend: "up" as const,
-  },
-  {
-    name: "Reefer Trailers — Owner Operators",
-    status: "Active",
-    objective: "Lead Generation",
-    adText: "New and used reefer trailers in stock. Great prices for owner-operators. Visit our Lakeland lot or browse online.",
-    spend: 892.30,
-    impressions: 38100,
-    clicks: 1120,
-    ctr: 2.94,
-    cpc: 0.80,
-    leads: 18,
-    costPerLead: 49.57,
-    trend: "up" as const,
-  },
-  {
-    name: "Flatbed Inventory — Retargeting",
-    status: "Active",
-    objective: "Conversions",
-    adText: "You looked at our flatbeds — they're still available! 15+ units in stock. Step decks, standards, and more.",
-    spend: 534.00,
-    impressions: 22400,
-    clicks: 687,
-    ctr: 3.07,
-    cpc: 0.78,
-    leads: 11,
-    costPerLead: 48.55,
-    trend: "flat" as const,
-  },
-  {
-    name: "Dry Van Clearance — Broad",
-    status: "Active",
-    objective: "Traffic",
-    adText: "End-of-quarter dry van clearance! Prices starting at $18,500. Limited inventory — first come, first served.",
-    spend: 312.80,
-    impressions: 18700,
-    clicks: 423,
-    ctr: 2.26,
-    cpc: 0.74,
-    leads: 5,
-    costPerLead: 62.56,
-    trend: "down" as const,
-  },
-  {
-    name: "Brand Awareness — Video Campaign",
-    status: "Active",
-    objective: "Brand Awareness",
-    adText: "Nationwide Haul — your trusted truck and trailer dealership in Florida. Watch our latest inventory walkthrough.",
-    spend: 198.40,
-    impressions: 52300,
-    clicks: 312,
-    ctr: 0.60,
-    cpc: 0.64,
-    leads: 2,
-    costPerLead: 99.20,
-    trend: "flat" as const,
-  },
-];
+type Campaign = {
+  name: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  cpc: number;
+  leads: number;
+  costPerLead: number;
+  trend: "up" | "down" | "flat";
+};
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 function AdTrendIcon({ trend }: { trend: "up" | "down" | "flat" }) {
   if (trend === "up") return <TrendingUp className="h-3 w-3 text-green-600" />;
@@ -85,13 +29,78 @@ function AdTrendIcon({ trend }: { trend: "up" | "down" | "flat" }) {
   return <div className="h-3 w-3" />;
 }
 
-export function ActiveAdsWidget({ config }: { config: WidgetConfig }) {
+function mapCampaigns(rows: any[]): Campaign[] { // eslint-disable-line @typescript-eslint/no-explicit-any
+  return rows
+    .map((row) => {
+      const spend = parseFloat(row.spend || "0");
+      const impressions = parseFloat(row.impressions || "0");
+      const clicks = parseFloat(row.clicks || "0");
+      const ctr = parseFloat(row.ctr || "0");
+      const cpc = parseFloat(row.cpc || "0");
+      const leadAction = row.actions?.find((a: any) => a.action_type === "lead"); // eslint-disable-line @typescript-eslint/no-explicit-any
+      const leads = leadAction ? parseFloat(leadAction.value || "0") : 0;
+      const costPerLead = leads > 0 ? spend / leads : 0;
+      return {
+        name: row.campaign_name || "Unnamed Campaign",
+        spend,
+        impressions,
+        clicks,
+        ctr,
+        cpc,
+        leads,
+        costPerLead,
+        trend: ctr >= 3 ? ("up" as const) : ctr < 1.5 ? ("down" as const) : ("flat" as const),
+      };
+    })
+    .sort((a, b) => b.spend - a.spend);
+}
+
+export function ActiveAdsWidget({ config }: { config: WidgetConfig }) { // eslint-disable-line @typescript-eslint/no-unused-vars
+  const { dateRange } = useDateRange();
+  const { apiAccountId } = useAccount();
+  const startDate = format(dateRange.from, "yyyy-MM-dd");
+  const endDate = format(dateRange.to, "yyyy-MM-dd");
+  const url = `/api/meta-ads?type=campaigns&startDate=${startDate}&endDate=${endDate}&accountId=${apiAccountId}`;
+
+  const { data, error, isLoading } = useSWR(url, fetcher, {
+    refreshInterval: 300000,
+    revalidateOnFocus: false,
+    dedupingInterval: 60000,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+        Loading campaigns…
+      </div>
+    );
+  }
+
+  if (error || data?.status === "error") {
+    return (
+      <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+        Unable to load campaigns
+      </div>
+    );
+  }
+
+  const rows: any[] = data?.data?.data ?? []; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const campaigns = mapCampaigns(rows);
+
+  if (campaigns.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center text-xs text-muted-foreground">
+        No active campaigns in this date range
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-auto px-3 py-2">
       <div className="space-y-3">
-        {activeAds.map((ad, i) => (
+        {campaigns.map((ad, i) => (
           <div key={i} className="rounded-lg border border-border p-3 hover:bg-muted/20 transition-colors">
-            {/* Header: name + status + objective */}
+            {/* Header: name + status */}
             <div className="flex items-start justify-between mb-2">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -99,21 +108,13 @@ export function ActiveAdsWidget({ config }: { config: WidgetConfig }) {
                   <p className="text-xs font-bold text-card-foreground truncate">{ad.name}</p>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">{ad.status}</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Active</span>
                   <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                    <Target className="h-2.5 w-2.5" /> {ad.objective}
+                    <MousePointerClick className="h-2.5 w-2.5" /> CPC {formatCurrency(ad.cpc)}
                   </span>
                 </div>
               </div>
               <span className="text-xs font-bold text-foreground shrink-0 ml-2">{formatCurrency(ad.spend)}</span>
-            </div>
-
-            {/* Ad text preview */}
-            <div className="flex gap-3 mb-2">
-              <div className="w-14 h-14 rounded-md bg-muted flex items-center justify-center shrink-0">
-                <Image className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-3">{ad.adText}</p>
             </div>
 
             {/* Metrics row */}
@@ -136,7 +137,9 @@ export function ActiveAdsWidget({ config }: { config: WidgetConfig }) {
               </div>
               <div className="text-center">
                 <p className="text-[10px] text-muted-foreground">CPL</p>
-                <p className={cn("text-xs font-bold", ad.costPerLead < 55 ? "text-green-600" : "text-foreground")}>{formatCurrency(ad.costPerLead)}</p>
+                <p className={cn("text-xs font-bold", ad.costPerLead > 0 && ad.costPerLead < 55 ? "text-green-600" : "text-foreground")}>
+                  {ad.leads > 0 ? formatCurrency(ad.costPerLead) : "—"}
+                </p>
               </div>
             </div>
           </div>
