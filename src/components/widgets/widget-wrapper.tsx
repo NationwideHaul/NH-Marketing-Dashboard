@@ -14,7 +14,9 @@ import { TopContentWidget } from "./top-content-widget";
 import { RecentContentWidget } from "./recent-content-widget";
 import { ActiveAdsWidget } from "./active-ads-widget";
 import { WidgetConfigPanel } from "./widget-config-panel";
+import { InfoTooltip } from "./info-tooltip";
 import { getDataSource } from "@/lib/widget-registry";
+import { getMetricDefinition } from "@/lib/metric-definitions";
 import type { WidgetConfig } from "@/types/widget";
 
 const widgetComponents: Record<string, React.ComponentType<{ config: WidgetConfig }>> = {
@@ -38,6 +40,7 @@ export function WidgetWrapper({ config }: { config: WidgetConfig }) {
   const [showConfig, setShowConfig] = useState(false);
   const Component = widgetComponents[config.type];
   const ds = getDataSource(config.dataSource);
+  const hasDefinition = !!getMetricDefinition(config.metric, config.dataSource);
 
   // Section headers get a minimal wrapper
   if (config.type === "section-header") {
@@ -63,6 +66,9 @@ export function WidgetWrapper({ config }: { config: WidgetConfig }) {
         <div className="flex items-center gap-2 min-w-0">
           {editMode && <GripVertical className="h-3.5 w-3.5 text-muted-foreground cursor-grab shrink-0 drag-handle" />}
           <span className="text-base font-semibold text-card-foreground truncate">{config.title}</span>
+          {hasDefinition && (
+            <InfoTooltip metric={config.metric} dataSource={config.dataSource} />
+          )}
         </div>
         <div className="flex items-center gap-0.5 shrink-0">
           {ds && <span className="text-xs text-muted-foreground px-1.5 py-0.5 bg-muted rounded hidden sm:block">{ds.label}</span>}
