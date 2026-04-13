@@ -306,6 +306,20 @@ function extractTimeSeries(apiResponse: any, metric: string): { date: string; va
     return Object.entries(byDate).map(([date, value]) => ({ date, value })).sort((a, b) => a.date.localeCompare(b.date));
   }
 
+  // Meta Social (Facebook/Instagram): pre-built daily time series from Page/IG Insights
+  if (apiResponse.platform === "meta" && d && !d.data) {
+    const seriesMap: Record<string, string> = {
+      reach: "reachTimeSeries",
+      interactions: "engagementTimeSeries",
+      postEngagement: "engagementTimeSeries",
+      views: "viewsTimeSeries",
+      pageViews: "viewsTimeSeries",
+      likes: "engagementTimeSeries",
+    };
+    const key = seriesMap[metric];
+    if (key && Array.isArray(d[key])) return d[key];
+  }
+
   // Meta Ads: daily rows with date_start
   if (apiResponse.platform === "meta" && d.data && Array.isArray(d.data)) {
     return d.data.map((row: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
