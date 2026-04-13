@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getYouTubeAnalytics, getYouTubeTopVideos, getYouTubeTrafficSources, getStoredGoogleClient } from "@/lib/api-clients/google";
+import { getYouTubeAnalytics, getYouTubeTopVideos, getYouTubeTrafficSources, getStoredYouTubeClient } from "@/lib/api-clients/google";
 import { getAccountCredentials } from "@/lib/account-credentials";
 
 export async function GET(request: NextRequest) {
@@ -17,8 +17,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { accessToken } = await getStoredGoogleClient();
-    const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+    const { accessToken } = await getStoredYouTubeClient();
+    const refreshToken = process.env.YOUTUBE_REFRESH_TOKEN || process.env.GOOGLE_REFRESH_TOKEN;
 
     let data;
     if (type === "top-videos") data = await getYouTubeTopVideos(accessToken, refreshToken, channelId, startDate, endDate);

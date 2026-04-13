@@ -11,32 +11,21 @@ function getOAuth2Client() {
   return oauth2Client;
 }
 
-// Get a fresh access token using the stored refresh token (no user session needed)
-let cachedAccessToken: string | null = null;
-let cachedTokenExpiry = 0;
+// Per-refresh-token cache of access tokens so each Google account used
+// (GA/Ads main account, separate YouTube owner, etc.) gets its own cached token.
+const tokenCache = new Map<string, { accessToken: string; expiry: number }>();
 
-export async function getStoredGoogleClient() {
-  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
-  if (!refreshToken) {
-    throw new Error("GOOGLE_REFRESH_TOKEN not set. Connect Google once to get it.");
-  }
-
+async function refreshAccessToken(refreshToken: string) {
+  const cached = tokenCache.get(refreshToken);
   const now = Date.now() / 1000;
+  if (cached && cached.expiry > now + 60) return cached.accessToken;
 
-  // Return cached token if still valid (with 60s buffer)
-  if (cachedAccessToken && cachedTokenExpiry > now + 60) {
-    const client = getOAuth2Client();
-    client.setCredentials({ access_token: cachedAccessToken, refresh_token: refreshToken });
-    return { client, accessToken: cachedAccessToken };
-  }
-
-  // Refresh the token
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID || "",
-      client_secret: process.env.GOOGLE_CLIENT_SECRET || "",
+      client_id: (process.env.GOOGLE_CLIENT_ID || "").trim(),
+      client_secret: (process.env.GOOGLE_CLIENT_SECRET || "").trim(),
       grant_type: "refresh_token",
       refresh_token: refreshToken,
     }),
@@ -47,12 +36,37 @@ export async function getStoredGoogleClient() {
     throw new Error(`Token refresh failed: ${data.error_description || data.error}`);
   }
 
-  cachedAccessToken = data.access_token;
-  cachedTokenExpiry = now + (data.expires_in || 3600);
+  tokenCache.set(refreshToken, {
+    accessToken: data.access_token,
+    expiry: now + (data.expires_in || 3600),
+  });
+  return data.access_token as string;
+}
 
+// Default Google client — used for GA, Google Ads, GMB, etc. (main account)
+export async function getStoredGoogleClient() {
+  const refreshToken = (process.env.GOOGLE_REFRESH_TOKEN || "").trim();
+  if (!refreshToken) {
+    throw new Error("GOOGLE_REFRESH_TOKEN not set. Connect Google once to get it.");
+  }
+  const accessToken = await refreshAccessToken(refreshToken);
   const client = getOAuth2Client();
-  client.setCredentials({ access_token: cachedAccessToken, refresh_token: refreshToken });
-  return { client, accessToken: cachedAccessToken! };
+  client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+  return { client, accessToken };
+}
+
+// YouTube-specific client — uses YOUTUBE_REFRESH_TOKEN if set (owned by the
+// channel-owner Google account), otherwise falls back to the main token.
+export async function getStoredYouTubeClient() {
+  const refreshToken =
+    (process.env.YOUTUBE_REFRESH_TOKEN || process.env.GOOGLE_REFRESH_TOKEN || "").trim();
+  if (!refreshToken) {
+    throw new Error("No refresh token configured for YouTube.");
+  }
+  const accessToken = await refreshAccessToken(refreshToken);
+  const client = getOAuth2Client();
+  client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
+  return { client, accessToken };
 }
 
 // Set credentials from session token (legacy - kept for backwards compatibility)
