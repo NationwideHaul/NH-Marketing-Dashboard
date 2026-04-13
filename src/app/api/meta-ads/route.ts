@@ -132,7 +132,7 @@ async function getInstagramData(igUserId: string, accessToken: string, pageId: s
   const untilTs = until ? toUnix(until) : Math.floor(Date.now() / 1000);
   let insights: any[] | null = null; // eslint-disable-line @typescript-eslint/no-explicit-any
   try {
-    const insightsRes = await fetch(`${META_BASE_URL}/${igUserId}/insights?metric=reach&metric_type=total_value&period=day&since=${sinceTs}&until=${untilTs}&access_token=${accessToken}`);
+    const insightsRes = await fetch(`${META_BASE_URL}/${igUserId}/insights?metric=reach&period=day&since=${sinceTs}&until=${untilTs}&access_token=${accessToken}`);
     const insightsData = await insightsRes.json();
     if (insightsData.data) insights = insightsData.data;
   } catch { /* no permission */ }
