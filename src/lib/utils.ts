@@ -12,11 +12,13 @@ export function formatNumber(value: number): string {
 }
 
 export function formatCurrency(value: number): string {
+  // Show decimals for small values (CPC, CPL) but not for large amounts
+  const decimals = Math.abs(value) < 10 ? 2 : 0;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   }).format(value);
 }
 

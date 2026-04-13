@@ -199,10 +199,84 @@ function extractMetric(apiResponse: any, metric: string, dataSource: string): nu
     }
   }
 
-  // Meta format
-  if (apiResponse.platform === "meta" && d.data) {
-    // Insights format
-    for (const insight of d.data) {
+  // Meta Social (Facebook/Instagram) — flat object with named metrics
+  if (apiResponse.platform === "meta" && d && !d.data && typeof d === "object") {
+    if (d[metric] !== undefined) return d[metric];
+    // Aliases for widget metric names
+    const aliases: Record<string, string> = {
+      pageViews: "views",
+      postEngagement: "interactions",
+      follows: "followers",
+      likes: "totalLikes",
+      mediaCount: "mediaCount",
+    };
+    if (aliases[metric] && d[aliases[metric]] !== undefined) return d[aliases[metric]];
+    return null;
+  }
+
+  // Meta Ads — daily rows from Meta Ads API (time_increment=1)
+  if (apiResponse.platform === "meta" && d.data && Array.isArray(d.data)) {
+    const rows = d.data;
+    // Summable metrics
+    const sumMetrics = ["spend", "impressions", "clicks", "reach"];
+    // Rate metrics — compute weighted average
+    const rateMetrics = ["ctr", "cpc"];
+
+    if (sumMetrics.includes(metric)) {
+      let total = 0;
+      for (const row of rows) {
+        total += parseFloat(row[metric] || "0");
+      }
+      return Math.round(total * 100) / 100;
+    }
+
+    if (metric === "ctr") {
+      // CTR = total clicks / total impressions * 100
+      let totalClicks = 0, totalImpressions = 0;
+      for (const row of rows) {
+        totalClicks += parseFloat(row.clicks || "0");
+        totalImpressions += parseFloat(row.impressions || "0");
+      }
+      return totalImpressions > 0 ? Math.round((totalClicks / totalImpressions) * 10000) / 100 : 0;
+    }
+
+    if (metric === "cpc") {
+      // CPC = total spend / total clicks
+      let totalSpend = 0, totalClicks = 0;
+      for (const row of rows) {
+        totalSpend += parseFloat(row.spend || "0");
+        totalClicks += parseFloat(row.clicks || "0");
+      }
+      return totalClicks > 0 ? Math.round((totalSpend / totalClicks) * 100) / 100 : 0;
+    }
+
+    // Leads — extract from actions array (action_type: "lead")
+    if (metric === "conversions" || metric === "leads") {
+      let total = 0;
+      for (const row of rows) {
+        if (row.actions) {
+          const lead = row.actions.find((a: any) => a.action_type === "lead"); // eslint-disable-line @typescript-eslint/no-explicit-any
+          if (lead) total += parseFloat(lead.value || "0");
+        }
+      }
+      return total;
+    }
+
+    // Cost per lead — extract from cost_per_action_type
+    if (metric === "costPerLead") {
+      let totalSpend = 0, totalLeads = 0;
+      for (const row of rows) {
+        totalSpend += parseFloat(row.spend || "0");
+        if (row.actions) {
+          const lead = row.actions.find((a: any) => a.action_type === "lead"); // eslint-disable-line @typescript-eslint/no-explicit-any
+          if (lead) totalLeads += parseFloat(lead.value || "0");
+        }
+      }
+      return totalLeads > 0 ? Math.round((totalSpend / totalLeads) * 100) / 100 : 0;
+    }
+
+    // Fallback — try direct field from first row
+    for (const insight of rows) {
       if (insight[metric] !== undefined) return parseFloat(insight[metric]);
     }
   }
@@ -230,6 +304,20 @@ function extractTimeSeries(apiResponse: any, metric: string): { date: string; va
       if (date) byDate[date] = (byDate[date] || 0) + 1;
     });
     return Object.entries(byDate).map(([date, value]) => ({ date, value })).sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  // Meta Ads: daily rows with date_start
+  if (apiResponse.platform === "meta" && d.data && Array.isArray(d.data)) {
+    return d.data.map((row: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+      let value = 0;
+      if (metric === "conversions" || metric === "leads") {
+        const lead = row.actions?.find((a: any) => a.action_type === "lead"); // eslint-disable-line @typescript-eslint/no-explicit-any
+        value = lead ? parseFloat(lead.value || "0") : 0;
+      } else {
+        value = parseFloat(row[metric] || "0");
+      }
+      return { date: row.date_start || "", value };
+    }).filter((p: any) => p.date); // eslint-disable-line @typescript-eslint/no-explicit-any
   }
 
   // GA4: rows with date dimension
