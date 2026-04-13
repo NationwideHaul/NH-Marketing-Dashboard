@@ -189,6 +189,21 @@ function extractMetric(apiResponse: any, metric: string, dataSource: string): nu
   // RingCentral format
   if (dataSource === "ringcentral" && d[metric] !== undefined) return d[metric];
 
+  // YouTube format (channel stats + videos[])
+  if (apiResponse.platform === "youtube") {
+    if (metric === "watchTime" || metric === "estimatedMinutesWatched") {
+      // Only available from Analytics API; return 0 when unavailable
+      return 0;
+    }
+    if (d[metric] !== undefined) return d[metric];
+    // Aliases
+    if (metric === "views") return d.totalViews ?? d.views ?? 0;
+    if (metric === "likes") return d.totalLikes ?? 0;
+    if (metric === "comments") return d.totalComments ?? 0;
+    if (metric === "videosPublished") return d.videoCount ?? d.videosPublished ?? 0;
+    return null;
+  }
+
   // Generic: try direct property access
   if (d[metric] !== undefined) return d[metric];
 
@@ -310,6 +325,48 @@ function extractTimeSeries(apiResponse: any, metric: string): { date: string; va
       if (date) byDate[date] = (byDate[date] || 0) + 1;
     });
     return Object.entries(byDate).map(([date, value]) => ({ date, value })).sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  // YouTube time series — prefer Analytics daily rows if available, otherwise
+  // aggregate videos[] by publishedAt month.
+  if (apiResponse.platform === "youtube") {
+    const analyticsRows = d.analytics?.rows;
+    if (Array.isArray(analyticsRows) && analyticsRows.length > 0) {
+      // columnHeaders: [day, views, estimatedMinutesWatched, subscribersGained, likes, comments]
+      const metricIdx: Record<string, number> = {
+        views: 1,
+        watchTime: 2,
+        estimatedMinutesWatched: 2,
+        subscribers: 3,
+        likes: 4,
+        comments: 5,
+      };
+      const idx = metricIdx[metric] ?? 1;
+      return analyticsRows.map((row: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+        date: row[0],
+        value: row[idx] || 0,
+      }));
+    }
+
+    // Fallback: aggregate videos by month
+    const videos: any[] = d.videos ?? []; // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (videos.length === 0) return [];
+    const byMonth: Record<string, number> = {};
+    for (const v of videos) {
+      if (!v.publishedAt) continue;
+      const d0 = new Date(v.publishedAt);
+      const key = `${d0.getFullYear()}-${String(d0.getMonth() + 1).padStart(2, "0")}-01`;
+      const val =
+        metric === "views" ? v.views || 0
+        : metric === "likes" ? v.likes || 0
+        : metric === "comments" ? v.comments || 0
+        : metric === "videosPublished" ? 1
+        : 0;
+      byMonth[key] = (byMonth[key] || 0) + val;
+    }
+    return Object.entries(byMonth)
+      .map(([date, value]) => ({ date, value }))
+      .sort((a, b) => a.date.localeCompare(b.date));
   }
 
   // Meta Social (Facebook/Instagram): pre-built daily time series from Page/IG Insights

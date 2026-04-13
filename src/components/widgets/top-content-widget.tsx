@@ -34,10 +34,16 @@ function useTopContent(dataSource: string): { items: TopItem[]; loading: boolean
   const startDate = format(dateRange.from, "yyyy-MM-dd");
   const endDate = format(dateRange.to, "yyyy-MM-dd");
 
-  const type = dataSource === "instagram" ? "instagram" : dataSource === "facebook" ? "facebook" : null;
-  const url = type
-    ? `/api/meta-ads?type=${type}&startDate=${startDate}&endDate=${endDate}&accountId=${apiAccountId}`
+  const type = dataSource === "instagram" ? "instagram"
+    : dataSource === "facebook" ? "facebook"
+    : dataSource === "youtube" ? "youtube"
     : null;
+  const url =
+    type === "youtube"
+      ? `/api/youtube?startDate=${startDate}&endDate=${endDate}&accountId=${apiAccountId}`
+      : type
+        ? `/api/meta-ads?type=${type}&startDate=${startDate}&endDate=${endDate}&accountId=${apiAccountId}`
+        : null;
 
   const { data, isLoading, error } = useSWR(url, fetcher, {
     refreshInterval: 300000,
@@ -68,6 +74,33 @@ function useTopContent(dataSource: string): { items: TopItem[]; loading: boolean
           thumbnail: p.image,
           permalink: p.permalink,
           _engagement: engagement,
+        };
+      })
+      .sort((a, b) => b._engagement - a._engagement)
+      .slice(0, 5);
+    return { items, loading: false, error: data?.status === "error" };
+  }
+
+  if (type === "youtube") {
+    const videos: any[] = data?.data?.videos ?? []; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const items = [...videos]
+      .map((v) => {
+        const views = v.views || 0;
+        const likes = v.likes || 0;
+        const comments = v.comments || 0;
+        const isShort = (v.duration || "").match(/PT(\d+)S/) && !(v.duration || "").includes("M");
+        return {
+          title: (v.title || "(no title)").slice(0, 90),
+          type: isShort ? "Short" : "Video",
+          engagement: [
+            { icon: "heart" as const, value: likes },
+            { icon: "comment" as const, value: comments },
+          ],
+          metric: views,
+          metricLabel: "views",
+          thumbnail: v.thumbnail,
+          permalink: v.permalink,
+          _engagement: views,
         };
       })
       .sort((a, b) => b._engagement - a._engagement)
@@ -109,7 +142,10 @@ function useTopContent(dataSource: string): { items: TopItem[]; loading: boolean
 
 export function TopContentWidget({ config }: { config: WidgetConfig }) {
   const { items, loading, error } = useTopContent(config.dataSource);
-  const supported = config.dataSource === "facebook" || config.dataSource === "instagram";
+  const supported =
+    config.dataSource === "facebook" ||
+    config.dataSource === "instagram" ||
+    config.dataSource === "youtube";
 
   if (!supported) {
     return (

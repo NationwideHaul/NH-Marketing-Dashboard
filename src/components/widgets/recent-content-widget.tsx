@@ -33,10 +33,16 @@ function useRecent(dataSource: string): { items: RecentItem[]; loading: boolean;
   const startDate = format(dateRange.from, "yyyy-MM-dd");
   const endDate = format(dateRange.to, "yyyy-MM-dd");
 
-  const type = dataSource === "instagram" ? "instagram" : dataSource === "facebook" ? "facebook" : null;
-  const url = type
-    ? `/api/meta-ads?type=${type}&startDate=${startDate}&endDate=${endDate}&accountId=${apiAccountId}`
+  const type = dataSource === "instagram" ? "instagram"
+    : dataSource === "facebook" ? "facebook"
+    : dataSource === "youtube" ? "youtube"
     : null;
+  const url =
+    type === "youtube"
+      ? `/api/youtube?startDate=${startDate}&endDate=${endDate}&accountId=${apiAccountId}`
+      : type
+        ? `/api/meta-ads?type=${type}&startDate=${startDate}&endDate=${endDate}&accountId=${apiAccountId}`
+        : null;
 
   const { data, isLoading, error } = useSWR(url, fetcher, {
     refreshInterval: 300000,
@@ -64,6 +70,30 @@ function useRecent(dataSource: string): { items: RecentItem[]; loading: boolean;
           ],
           thumbnail: p.image,
           permalink: p.permalink,
+          _ts: created.getTime(),
+        };
+      })
+      .sort((a, b) => b._ts - a._ts)
+      .slice(0, 6);
+    return { items, loading: false, error: data?.status === "error" };
+  }
+
+  if (type === "youtube") {
+    const videos: any[] = data?.data?.videos ?? []; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const items = [...videos]
+      .map((v) => {
+        const created = v.publishedAt ? new Date(v.publishedAt) : now;
+        const isShort = (v.duration || "").match(/PT(\d+)S/) && !(v.duration || "").includes("M");
+        return {
+          title: (v.title || "(no title)").slice(0, 90),
+          daysAgo: Math.max(0, differenceInDays(now, created)),
+          type: isShort ? "Short" : "Video",
+          engagement: [
+            { icon: "heart" as const, value: v.likes || 0 },
+            { icon: "comment" as const, value: v.comments || 0 },
+          ],
+          thumbnail: v.thumbnail,
+          permalink: v.permalink,
           _ts: created.getTime(),
         };
       })
@@ -103,7 +133,10 @@ function useRecent(dataSource: string): { items: RecentItem[]; loading: boolean;
 
 export function RecentContentWidget({ config }: { config: WidgetConfig }) {
   const { items, loading, error } = useRecent(config.dataSource);
-  const supported = config.dataSource === "facebook" || config.dataSource === "instagram";
+  const supported =
+    config.dataSource === "facebook" ||
+    config.dataSource === "instagram" ||
+    config.dataSource === "youtube";
 
   if (!supported) {
     return (

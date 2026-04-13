@@ -203,6 +203,62 @@ export async function getGMBData(
   return response.json();
 }
 
+// ========== YOUTUBE DATA API (works for Brand Account managers) ==========
+export async function getYouTubeChannelStats(accessToken: string, channelId: string) {
+  const res = await fetch(
+    `https://www.googleapis.com/youtube/v3/channels?part=id,snippet,statistics&id=${channelId}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  if (!res.ok) throw new Error(`YouTube Data API ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  return data.items?.[0] || null;
+}
+
+export async function getYouTubeRecentVideosWithStats(
+  accessToken: string,
+  channelId: string,
+  maxResults = 20
+) {
+  // 1. Get uploads playlist id from channel
+  const chRes = await fetch(
+    `https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${channelId}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  const chData = await chRes.json();
+  const uploadsId = chData.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+  if (!uploadsId) return [];
+
+  // 2. List latest videos from uploads playlist
+  const plRes = await fetch(
+    `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=${uploadsId}&maxResults=${maxResults}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  const plData = await plRes.json();
+  const videoIds: string[] = (plData.items || [])
+    .map((it: any) => it.contentDetails?.videoId) // eslint-disable-line @typescript-eslint/no-explicit-any
+    .filter(Boolean);
+  if (videoIds.length === 0) return [];
+
+  // 3. Fetch video details + stats
+  const vRes = await fetch(
+    `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${videoIds.join(",")}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  const vData = await vRes.json();
+  return (vData.items || []).map((v: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+    id: v.id,
+    title: v.snippet?.title,
+    description: v.snippet?.description,
+    publishedAt: v.snippet?.publishedAt,
+    thumbnail: v.snippet?.thumbnails?.medium?.url || v.snippet?.thumbnails?.default?.url,
+    duration: v.contentDetails?.duration,
+    views: parseInt(v.statistics?.viewCount || "0", 10),
+    likes: parseInt(v.statistics?.likeCount || "0", 10),
+    comments: parseInt(v.statistics?.commentCount || "0", 10),
+    permalink: `https://www.youtube.com/watch?v=${v.id}`,
+  }));
+}
+
 // ========== YOUTUBE ANALYTICS ==========
 export async function getYouTubeAnalytics(
   accessToken: string,
