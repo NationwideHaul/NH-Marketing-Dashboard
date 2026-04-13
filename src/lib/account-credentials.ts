@@ -41,7 +41,7 @@ const accountCredentials: Record<string, AccountCredentials> = {
     googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "Nationwide Haul",
     ghlLocationId: env.GHL_LOCATION_ID || "IEs4Gwg925sPu0AYNpdS",
-    ghlApiKey: env.GHL_API_KEY,
+    ghlApiKey: env.GHL_API_KEY_NATIONWIDE_HAUL || env.GHL_API_KEY,
     metaAdAccountId: env.META_AD_ACCOUNT_ID,
     metaAccessToken: env.META_ACCESS_TOKEN,
     metaPageId: env.META_PAGE_ID,
@@ -55,7 +55,7 @@ const accountCredentials: Record<string, AccountCredentials> = {
     googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "NFI Truck Sales",
     ghlLocationId: "bQFOVHhca9fD7V3faeS1",
-    ghlApiKey: env.GHL_API_KEY, // Same agency key, different location
+    ghlApiKey: env.GHL_API_KEY_NFI || env.GHL_API_KEY,
     ringcentralEnabled: true,
   },
   "nhttr": {
@@ -114,6 +114,8 @@ const accountCredentials: Record<string, AccountCredentials> = {
     ga4PropertyId: "350112166",
     googleAdsCustomerId: "1866416925",
     googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    ghlLocationId: "PEN2IZLLlQwf1PpQJhyx",
+    ghlApiKey: env.GHL_API_KEY_ROAD_READY || env.GHL_API_KEY,
   },
 };
 
