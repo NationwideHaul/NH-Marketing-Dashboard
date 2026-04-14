@@ -18,32 +18,88 @@ import { format as fmtDate, differenceInDays, parseISO } from "date-fns";
 /*  Hook: fetch live CRM info-submit data per platform per month      */
 /* ------------------------------------------------------------------ */
 
-interface CRMMonthEntry {
-  month: string;
-  monthKey: string;
-  infoSubmitsByPlatform: Record<string, number>;
-  callsByPlatform: Record<string, number>;
+/* ------------------------------------------------------------------ */
+/*  CallRail tracker_name → platform mapping                          */
+/* ------------------------------------------------------------------ */
+
+const TRACKER_TO_PLATFORM: [string, string][] = [
+  ["Truck Paper", "TruckPaper"],
+  ["Commercial Truck Trader", "Commercial Truck Trader"],
+  ["My Little Salesman", "My Little Salesman"],
+  ["Cherry Trader", "Cherry Trader"],
+  ["Sleeper Trader", "Sleeper Trader"],
+  ["NH Website", "NH Website"],
+  ["Main Nationwide Haul Website", "NH Website"],
+  ["Nationwide Haul.com", "NH Website"],
+  ["NH Listing Details", "NH Website"],
+  ["Nationwide Haul Inventory", "NH Website"],
+  ["Ritchie List", "RitchieList"],
+  ["Next Truck Online", "Next Truck Online"],
+  ["Machinio", "Machinio"],
+  ["Trucker to Trucker", "Trucker to Trucker"],
+];
+
+function trackerToPlatform(trackerName: string): string | null {
+  for (const [pattern, platform] of TRACKER_TO_PLATFORM) {
+    if (trackerName.includes(pattern)) return platform;
+  }
+  return null;
 }
 
-function useCRMPlatformLeads(accountId: string, startDate: string, endDate: string) {
-  const [data, setData] = useState<CRMMonthEntry[] | null>(null);
+/* ------------------------------------------------------------------ */
+/*  Hooks: fetch CRM info submits + CallRail calls                    */
+/* ------------------------------------------------------------------ */
+
+interface LivePlatformData {
+  infoSubmits: Record<string, number>;
+  calls: Record<string, number>;
+}
+
+function useLivePlatformData(accountId: string, startDate: string, endDate: string) {
+  const [data, setData] = useState<LivePlatformData | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Only fetch for Nationwide Haul (CRM is NH-specific)
     if (accountId !== "nationwide-haul") return;
 
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/inventory-platform-leads?startDate=${startDate}&endDate=${endDate}`)
-      .then((r) => r.json())
-      .then((res) => {
-        if (!cancelled && res.status === "live" && res.data) {
-          setData(res.data);
+
+    // Fetch CRM info submits + CallRail calls in parallel
+    Promise.all([
+      fetch(`/api/inventory-platform-leads?startDate=${startDate}&endDate=${endDate}`)
+        .then((r) => r.json())
+        .catch(() => null),
+      fetch(`/api/callrail?startDate=${startDate}&endDate=${endDate}&accountId=${accountId}`)
+        .then((r) => r.json())
+        .catch(() => null),
+    ]).then(([crmRes, callRes]) => {
+      if (cancelled) return;
+
+      // Aggregate CRM info submits by platform
+      const infoSubmits: Record<string, number> = {};
+      if (crmRes?.status === "live" && crmRes.data) {
+        for (const entry of crmRes.data) {
+          const byPlatform = entry.byPlatform || entry.infoSubmitsByPlatform || {};
+          for (const [platform, count] of Object.entries(byPlatform)) {
+            infoSubmits[platform] = (infoSubmits[platform] || 0) + (count as number);
+          }
         }
-      })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setLoading(false); });
+      }
+
+      // Map CallRail tracker breakdown to platforms
+      const calls: Record<string, number> = {};
+      if (callRes?.status === "live" && callRes.data?.trackerBreakdown) {
+        for (const { tracker, count } of callRes.data.trackerBreakdown) {
+          const platform = trackerToPlatform(tracker);
+          if (platform) {
+            calls[platform] = (calls[platform] || 0) + count;
+          }
+        }
+      }
+
+      setData({ infoSubmits, calls });
+    }).finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
   }, [accountId, startDate, endDate]);
@@ -51,28 +107,30 @@ function useCRMPlatformLeads(accountId: string, startDate: string, endDate: stri
   return { data, loading };
 }
 
-/** Merge static platform data with live CRM info-submit counts */
-function mergePlatformsWithCRM(
+/** Merge live data into platform cards */
+function mergePlatformsWithLive(
   platforms: PlatformData[],
-  crmData: CRMMonthEntry[] | null,
+  liveData: LivePlatformData | null,
 ): PlatformData[] {
-  if (!crmData) return platforms;
+  if (!liveData) return platforms;
 
   return platforms.map((p) => {
-    const updatedMonthly = crmData.map((entry) => {
-      const infoSubmits = entry.infoSubmitsByPlatform[p.name] || 0;
-      const calls = entry.callsByPlatform[p.name] || 0;
-      const price = p.pricePerMonth;
-      return {
-        month: entry.month,
-        calls,
-        infoSubmits,
-        leads: calls + infoSubmits,
-        price,
-      };
-    });
+    const infoSubmits = liveData.infoSubmits[p.name] || 0;
+    const calls = liveData.calls[p.name] || 0;
+    const leads = calls + infoSubmits;
+    const price = p.pricePerMonth;
 
-    return { ...p, monthlyData: updatedMonthly };
+    // Keep existing monthly data for charts, update latest month with live totals
+    const monthlyData = p.monthlyData.length > 0 ? [...p.monthlyData] : [];
+    // Replace or add a "Current" entry as the latest month
+    const currentEntry = { month: "Current", calls, infoSubmits, leads, price };
+    if (monthlyData.length > 0) {
+      monthlyData[monthlyData.length - 1] = currentEntry;
+    } else {
+      monthlyData.push(currentEntry);
+    }
+
+    return { ...p, monthlyData };
   });
 }
 
@@ -597,12 +655,12 @@ export default function InventoryPlatformsPage() {
   const isNHTTR = currentAccount.id === "nhttr";
   const startStr = fmtDate(dateRange.from, "yyyy-MM-dd");
   const endStr = fmtDate(dateRange.to, "yyyy-MM-dd");
-  const { data: crmData, loading } = useCRMPlatformLeads(currentAccount.id, startStr, endStr);
+  const { data: liveData, loading } = useLivePlatformData(currentAccount.id, startStr, endStr);
 
-  // Merge live CRM info-submit data with static platform config
+  // Merge live CRM + CallRail data into platform cards
   const platforms = useMemo(
-    () => mergePlatformsWithCRM(staticPlatforms, crmData),
-    [staticPlatforms, crmData],
+    () => mergePlatformsWithLive(staticPlatforms, liveData),
+    [staticPlatforms, liveData],
   );
 
   return (
