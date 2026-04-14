@@ -21,7 +21,8 @@ import { format as fmtDate, differenceInDays, parseISO } from "date-fns";
 interface CRMMonthEntry {
   month: string;
   monthKey: string;
-  byPlatform: Record<string, number>;
+  infoSubmitsByPlatform: Record<string, number>;
+  callsByPlatform: Record<string, number>;
 }
 
 function useCRMPlatformLeads(accountId: string, startDate: string, endDate: string) {
@@ -59,11 +60,9 @@ function mergePlatformsWithCRM(
 
   return platforms.map((p) => {
     const updatedMonthly = crmData.map((entry) => {
-      const infoSubmits = entry.byPlatform[p.name] || 0;
-      // Find matching static month or use defaults
-      const staticMonth = p.monthlyData.find((m) => m.month === entry.month);
-      const calls = staticMonth?.calls || 0;
-      const price = staticMonth?.price || p.pricePerMonth;
+      const infoSubmits = entry.infoSubmitsByPlatform[p.name] || 0;
+      const calls = entry.callsByPlatform[p.name] || 0;
+      const price = p.pricePerMonth;
       return {
         month: entry.month,
         calls,
