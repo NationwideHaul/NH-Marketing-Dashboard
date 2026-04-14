@@ -31,6 +31,7 @@ export async function listCompanies(accountId: string) {
 }
 
 // Get calls for an account, optionally filtered by company ID
+// Paginates automatically to fetch ALL calls in the date range
 export async function getCalls(
   accountId: string,
   startDate: string, // YYYY-MM-DD
@@ -38,19 +39,36 @@ export async function getCalls(
   companyId?: string,
   perPage: number = 250
 ) {
-  const params = new URLSearchParams({
-    start_date: startDate,
-    end_date: endDate,
-    per_page: String(perPage),
-  });
-  if (companyId) params.set("company_id", companyId);
+  const allCalls: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
+  let page = 1;
+  let hasMore = true;
 
-  const response = await fetch(
-    `${CR_BASE_URL}/a/${accountId}/calls.json?${params}`,
-    { headers: getHeaders() }
-  );
-  if (!response.ok) throw new Error(`CallRail API error: ${response.status}`);
-  return response.json();
+  while (hasMore) {
+    const params = new URLSearchParams({
+      start_date: startDate,
+      end_date: endDate,
+      per_page: String(perPage),
+      page: String(page),
+      fields: "tracker_name,tracker_id,source_name",
+    });
+    if (companyId) params.set("company_id", companyId);
+
+    const response = await fetch(
+      `${CR_BASE_URL}/a/${accountId}/calls.json?${params}`,
+      { headers: getHeaders() }
+    );
+    if (!response.ok) throw new Error(`CallRail API error: ${response.status}`);
+
+    const data = await response.json();
+    const calls = data.calls || [];
+    allCalls.push(...calls);
+
+    // Check if there are more pages
+    hasMore = calls.length === perPage && page < 10; // Safety cap at 10 pages (2500 calls)
+    page++;
+  }
+
+  return { calls: allCalls };
 }
 
 // Get call analytics/summary
