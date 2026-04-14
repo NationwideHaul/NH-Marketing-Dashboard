@@ -179,25 +179,10 @@ export const callLogsDefaults: PageDefault = {
 };
 
 // ==================== EMAIL MARKETING ====================
+// All email stats are now manually tracked via EmailStatsHeader (no GHL API widgets)
 export const emailDefaults: PageDefault = {
-  widgets: [
-    { id: "em-1", type: "stat", title: "Emails Sent", dataSource: "email-marketing", metric: "emailsSent", format: "number", comparisonEnabled: true },
-    { id: "em-2", type: "stat", title: "Open Rate", dataSource: "email-marketing", metric: "openRate", format: "percent", comparisonEnabled: true },
-    { id: "em-3", type: "stat", title: "Click Rate", dataSource: "email-marketing", metric: "clickRate", format: "percent", comparisonEnabled: true },
-    { id: "em-4", type: "stat", title: "New Contacts", dataSource: "email-marketing", metric: "newContacts", format: "number", comparisonEnabled: true },
-    { id: "em-5", type: "line-chart", title: "Emails Sent Over Time", dataSource: "email-marketing", metric: "emailsSent", format: "number" },
-    { id: "em-6", type: "line-chart", title: "Open Rate Trend", dataSource: "email-marketing", metric: "openRate", format: "percent" },
-  ],
-  layouts: {
-    lg: [
-      ...row([{ id: "em-1", w: 3, h: 2 }, { id: "em-2", w: 3, h: 2 }, { id: "em-3", w: 3, h: 2 }, { id: "em-4", w: 3, h: 2 }], 0),
-      ...row([{ id: "em-5", w: 6, h: 5, minW: 3, minH: 3 }, { id: "em-6", w: 6, h: 5, minW: 3, minH: 3 }], 2),
-    ],
-    md: [
-      ...row([{ id: "em-1", w: 2, h: 2 }, { id: "em-2", w: 2, h: 2 }, { id: "em-3", w: 2, h: 2 }, { id: "em-4", w: 2, h: 2 }], 0),
-      ...row([{ id: "em-5", w: 4, h: 5, minW: 3, minH: 3 }, { id: "em-6", w: 4, h: 5, minW: 3, minH: 3 }], 2),
-    ],
-  },
+  widgets: [],
+  layouts: { lg: [], md: [] },
 };
 
 // ==================== META ADS ====================
