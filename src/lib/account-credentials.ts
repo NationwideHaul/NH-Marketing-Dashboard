@@ -23,6 +23,7 @@ export interface AccountCredentials {
   googleAdsCustomerId?: string;
   googleAdsDeveloperToken?: string;
   callrailCompanyName?: string;
+  callrailCompanyId?: string;
   ghlLocationId?: string;
   ghlApiKey?: string;
   metaAdAccountId?: string;
@@ -40,6 +41,7 @@ const accountCredentials: Record<string, AccountCredentials> = {
     googleAdsCustomerId: "4504773990",
     googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "Nationwide Haul",
+    callrailCompanyId: "901305667",
     ghlLocationId: env.GHL_LOCATION_ID || "IEs4Gwg925sPu0AYNpdS",
     ghlApiKey: env.GHL_API_KEY_NATIONWIDE_HAUL || env.GHL_API_KEY,
     metaAdAccountId: env.META_AD_ACCOUNT_ID,
@@ -54,6 +56,7 @@ const accountCredentials: Record<string, AccountCredentials> = {
     googleAdsCustomerId: "4307362539",
     googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "NFI Truck Sales",
+    callrailCompanyId: "182573673",
     ghlLocationId: "bQFOVHhca9fD7V3faeS1",
     ghlApiKey: env.GHL_API_KEY_NFI || env.GHL_API_KEY,
     ringcentralEnabled: true,
@@ -64,6 +67,7 @@ const accountCredentials: Record<string, AccountCredentials> = {
     googleAdsCustomerId: "1073209892",
     googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "NH Repair Shops",
+    callrailCompanyId: "682402393",
     ringcentralEnabled: true,
     gmbLocations: [
       {
@@ -85,6 +89,7 @@ const accountCredentials: Record<string, AccountCredentials> = {
     googleAdsCustomerId: "1073209892",
     googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "NH Repair Shops",
+    callrailCompanyId: "682402393",
     ringcentralEnabled: true,
     gmbLocations: [
       {
@@ -100,6 +105,7 @@ const accountCredentials: Record<string, AccountCredentials> = {
     googleAdsCustomerId: "6515085474",
     googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "NH Repair Shops",
+    callrailCompanyId: "682402393",
     ringcentralEnabled: true,
     gmbLocations: [
       {
@@ -114,6 +120,8 @@ const accountCredentials: Record<string, AccountCredentials> = {
     ga4PropertyId: "350112166",
     googleAdsCustomerId: "1866416925",
     googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
+    callrailCompanyName: "Complete Carrier Coverage/Road Ready",
+    callrailCompanyId: "753432103",
     ghlLocationId: "PEN2IZLLlQwf1PpQJhyx",
     ghlApiKey: env.GHL_API_KEY_ROAD_READY || env.GHL_API_KEY,
   },

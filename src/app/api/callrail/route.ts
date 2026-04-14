@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listAccounts, getCallSummary, getCalls, findCompanyId, getTrackingNumbers } from "@/lib/api-clients/callrail";
+import { listAccounts, getCallSummary, getCalls, getTrackingNumbers } from "@/lib/api-clients/callrail";
 import { getAccountCredentials } from "@/lib/account-credentials";
 import { format, subDays } from "date-fns";
 
-// Cache company IDs so we don't look them up on every request
-const companyIdCache: Record<string, string> = {};
+// Cache the top-level CallRail account ID (same for all companies)
+let cachedCRAccountId: string | null = null;
+
+async function getCRAccountId(): Promise<string> {
+  if (cachedCRAccountId) return cachedCRAccountId;
+  const accountsData = await listAccounts();
+  const accounts = accountsData.accounts || [];
+  if (accounts.length === 0) throw new Error("No CallRail accounts found");
+  cachedCRAccountId = accounts[0].id;
+  return cachedCRAccountId;
+}
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -21,54 +30,49 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Get the company name for this dashboard account
+  // Get credentials for this dashboard account — includes company ID
   const creds = getAccountCredentials(dashboardAccountId);
-  const companyName = creds.callrailCompanyName || "Nationwide Haul";
+  const companyId = creds.callrailCompanyId;
+  const companyName = creds.callrailCompanyName || dashboardAccountId;
+
+  if (!companyId) {
+    return NextResponse.json({
+      platform: "callrail",
+      status: "error",
+      message: `No CallRail company ID configured for account "${dashboardAccountId}".`,
+    });
+  }
 
   try {
-    // Get the CallRail account ID
-    const accountsData = await listAccounts();
-    const accounts = accountsData.accounts || [];
-
-    if (accounts.length === 0) {
-      return NextResponse.json({ platform: "callrail", status: "error", error: "No CallRail accounts found" });
-    }
-
-    const crAccountId = accounts[0].id;
-
-    // Find the company ID for this dashboard account's company
-    let companyId = companyIdCache[companyName];
-    if (!companyId) {
-      companyId = await findCompanyId(crAccountId, companyName) || "";
-      if (companyId) companyIdCache[companyName] = companyId;
-    }
+    const crAccountId = await getCRAccountId();
 
     if (type === "accounts") {
-      return NextResponse.json({ platform: "callrail", status: "live", data: accounts });
+      const accountsData = await listAccounts();
+      return NextResponse.json({ platform: "callrail", status: "live", data: accountsData.accounts || [] });
     }
 
     if (type === "trackers") {
-      const data = await getTrackingNumbers(crAccountId, companyId || undefined);
-      return NextResponse.json({ platform: "callrail", status: "live", companyName, data });
+      const data = await getTrackingNumbers(crAccountId, companyId);
+      return NextResponse.json({ platform: "callrail", status: "live", companyName, companyId, data });
     }
 
     if (type === "calls") {
-      const data = await getCalls(crAccountId, startDate, endDate, companyId || undefined);
-      return NextResponse.json({ platform: "callrail", status: "live", companyName, data });
+      const data = await getCalls(crAccountId, startDate, endDate, companyId);
+      return NextResponse.json({ platform: "callrail", status: "live", companyName, companyId, data });
     }
 
-    // Default: summary filtered by company
-    const data = await getCallSummary(crAccountId, startDate, endDate, companyId || undefined);
+    // Default: summary filtered by company ID
+    const data = await getCallSummary(crAccountId, startDate, endDate, companyId);
     return NextResponse.json({
       platform: "callrail",
       status: "live",
       accountId: dashboardAccountId,
       companyName,
-      companyId: companyId || null,
+      companyId,
       data,
     });
   } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-    console.error(`CallRail API error (company: ${companyName}):`, error.message);
+    console.error(`CallRail API error (${companyName}, companyId: ${companyId}):`, error.message);
     return NextResponse.json({ platform: "callrail", status: "error", error: error.message }, { status: 500 });
   }
 }

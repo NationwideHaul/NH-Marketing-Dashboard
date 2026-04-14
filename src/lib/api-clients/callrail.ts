@@ -31,7 +31,7 @@ export async function listCompanies(accountId: string) {
 }
 
 // Get calls for an account, optionally filtered by company ID
-// Paginates automatically to fetch ALL calls in the date range
+// Paginates to fetch ALL calls in the date range
 export async function getCalls(
   accountId: string,
   startDate: string, // YYYY-MM-DD
@@ -41,9 +41,9 @@ export async function getCalls(
 ) {
   const allCalls: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
   let page = 1;
-  let hasMore = true;
+  let totalPages = 1;
 
-  while (hasMore) {
+  while (page <= totalPages && page <= 10) { // Safety cap at 10 pages
     const params = new URLSearchParams({
       start_date: startDate,
       end_date: endDate,
@@ -60,15 +60,12 @@ export async function getCalls(
     if (!response.ok) throw new Error(`CallRail API error: ${response.status}`);
 
     const data = await response.json();
-    const calls = data.calls || [];
-    allCalls.push(...calls);
-
-    // Check if there are more pages
-    hasMore = calls.length === perPage && page < 10; // Safety cap at 10 pages (2500 calls)
+    allCalls.push(...(data.calls || []));
+    totalPages = data.total_pages || 1;
     page++;
   }
 
-  return { calls: allCalls };
+  return { calls: allCalls, total_records: allCalls.length };
 }
 
 // Get call analytics/summary
