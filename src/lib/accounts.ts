@@ -53,7 +53,7 @@ export const accounts: SubAccount[] = [
     tabs: [
       "overview", "google-analytics", "google-ads", "gmb",
       "social-media", "meta-ads", "inventory-platforms",
-      "call-logs", "crm-leads", "email-marketing", "roi-metrics", "budget",
+      "call-logs", "email-marketing", "roi-metrics", "budget",
     ],
     config: {
       ga4PropertyId: "333711970",
@@ -204,7 +204,6 @@ export const allTabs = [
   { id: "inventory-platforms", label: "Inventory Platforms", href: "/inventory-platforms", icon: "Layers" },
   { id: "referral-sources", label: "Referral Sources", href: "/referral-sources", icon: "Link2" },
   { id: "call-logs", label: "Call Logs", href: "/call-logs", icon: "PhoneCall" },
-  { id: "crm-leads", label: "CRM Leads", href: "/crm-leads", icon: "Database" },
   { id: "email-marketing", label: "Email Marketing", href: "/go-high-level", icon: "Mail" },
   { id: "roi-metrics", label: "ROI & Revenue", href: "/roi-metrics", icon: "TrendingUp" },
   { id: "budget", label: "Budget", href: "/budget", icon: "Wallet" },
