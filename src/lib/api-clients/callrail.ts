@@ -49,7 +49,7 @@ export async function getCalls(
       end_date: endDate,
       per_page: String(perPage),
       page: String(page),
-      fields: "tracker_name,tracker_id,source_name",
+      fields: "source_name,tracker_id",
     });
     if (companyId) params.set("company_id", companyId);
 
@@ -94,10 +94,10 @@ export async function getCallSummary(
     sources[src] = (sources[src] || 0) + 1;
   });
 
-  // Tracker name breakdown (for inventory platforms -- which tracking number got the call)
+  // Tracker/source name breakdown (for inventory platforms -- which tracking number got the call)
   const trackerBreakdown: Record<string, number> = {};
   calls.forEach((c: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-    const tracker = c.tracker_name || c.tracking_phone_number || "Unknown";
+    const tracker = c.source_name || c.tracking_phone_number || "Unknown";
     trackerBreakdown[tracker] = (trackerBreakdown[tracker] || 0) + 1;
   });
 
