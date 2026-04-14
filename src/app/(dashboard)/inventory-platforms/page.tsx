@@ -669,7 +669,7 @@ export default function InventoryPlatformsPage() {
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-bold text-foreground">Inventory Platforms</h2>
           {loading && <RefreshCw className="h-4 w-4 text-muted-foreground animate-spin" />}
-          {crmData && !loading && (
+          {liveData && !loading && (
             <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">CRM Live</span>
           )}
         </div>
