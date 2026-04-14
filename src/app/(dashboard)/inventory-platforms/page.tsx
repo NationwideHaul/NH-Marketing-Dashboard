@@ -1,17 +1,80 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
-import { Layers, TrendingUp, TrendingDown, Award, AlertTriangle, Calendar, DollarSign, Phone } from "lucide-react";
+import { Layers, TrendingUp, TrendingDown, Award, AlertTriangle, Calendar, DollarSign, Phone, RefreshCw } from "lucide-react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { DataSourceBadge } from "@/components/layout/data-source-badge";
 import { externalLinks } from "@/lib/external-links";
 import { useAccount } from "@/context/account-context";
 import { getPlatformsForAccount, type PlatformData } from "@/lib/inventory-platforms-data";
-import { format, differenceInDays, parseISO } from "date-fns";
+import { format as fmtDate, differenceInDays, parseISO } from "date-fns";
+
+/* ------------------------------------------------------------------ */
+/*  Hook: fetch live CRM info-submit data per platform per month      */
+/* ------------------------------------------------------------------ */
+
+interface CRMMonthEntry {
+  month: string;
+  monthKey: string;
+  byPlatform: Record<string, number>;
+}
+
+function useCRMPlatformLeads(accountId: string) {
+  const [data, setData] = useState<CRMMonthEntry[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Only fetch for Nationwide Haul (CRM is NH-specific)
+    if (accountId !== "nationwide-haul") return;
+
+    let cancelled = false;
+    setLoading(true);
+    fetch("/api/inventory-platform-leads?months=7")
+      .then((r) => r.json())
+      .then((res) => {
+        if (!cancelled && res.status === "live" && res.data) {
+          setData(res.data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [accountId]);
+
+  return { data, loading };
+}
+
+/** Merge static platform data with live CRM info-submit counts */
+function mergePlatformsWithCRM(
+  platforms: PlatformData[],
+  crmData: CRMMonthEntry[] | null,
+): PlatformData[] {
+  if (!crmData) return platforms;
+
+  return platforms.map((p) => {
+    const updatedMonthly = crmData.map((entry) => {
+      const infoSubmits = entry.byPlatform[p.name] || 0;
+      // Find matching static month or use defaults
+      const staticMonth = p.monthlyData.find((m) => m.month === entry.month);
+      const calls = staticMonth?.calls || 0;
+      const price = staticMonth?.price || p.pricePerMonth;
+      return {
+        month: entry.month,
+        calls,
+        infoSubmits,
+        leads: calls + infoSubmits,
+        price,
+      };
+    });
+
+    return { ...p, monthlyData: updatedMonthly };
+  });
+}
 
 // Compute current month stats
 function getCurrentStats(p: PlatformData) {
@@ -168,7 +231,7 @@ function NHTTRPlatformView({ platforms }: { platforms: PlatformData[] }) {
                           <div className="flex items-center gap-1.5">
                             <Calendar className={`h-3 w-3 ${isPast ? "text-red-600" : isUrgent ? "text-amber-600" : "text-gray-500"}`} />
                             <span className={`text-xs font-medium ${isPast ? "text-red-700" : isUrgent ? "text-amber-700" : "text-gray-600"}`}>
-                              Renewal: {format(parseISO(p.renewalDate), "MMM d, yyyy")}
+                              Renewal: {fmtDate(parseISO(p.renewalDate), "MMM d, yyyy")}
                             </span>
                           </div>
                           <p className={`text-[10px] mt-0.5 ${isPast ? "text-red-600" : isUrgent ? "text-amber-600" : "text-gray-500"}`}>
@@ -272,7 +335,7 @@ function NHTTRPlatformView({ platforms }: { platforms: PlatformData[] }) {
                         </td>
                         <td className="px-4 py-2.5 text-right font-bold text-primary">{formatCurrency(costPerCall)}</td>
                         <td className="px-4 py-2.5 text-right text-xs text-muted-foreground">
-                          {p.renewalDate ? format(parseISO(p.renewalDate), "MMM d, yyyy") : "--"}
+                          {p.renewalDate ? fmtDate(parseISO(p.renewalDate), "MMM d, yyyy") : "--"}
                         </td>
                       </tr>
                     );
@@ -519,20 +582,33 @@ function FullPlatformView({ platforms }: { platforms: PlatformData[] }) {
         </div>
       )}
 
-      <p className="text-[10px] text-muted-foreground text-center">Data source: Google Sheet (Fleet Sales List). Will be connected to CRM + CallRail for live data.</p>
+      <p className="text-[10px] text-muted-foreground text-center">Info submits from CRM lead routing. Calls from CallRail.</p>
     </div>
   );
 }
 
 export default function InventoryPlatformsPage() {
   const { currentAccount } = useAccount();
-  const platforms = getPlatformsForAccount(currentAccount.id);
+  const staticPlatforms = getPlatformsForAccount(currentAccount.id);
   const isNHTTR = currentAccount.id === "nhttr";
+  const { data: crmData, loading } = useCRMPlatformLeads(currentAccount.id);
+
+  // Merge live CRM info-submit data with static platform config
+  const platforms = useMemo(
+    () => mergePlatformsWithCRM(staticPlatforms, crmData),
+    [staticPlatforms, crmData],
+  );
 
   return (
     <div>
       <div className="mb-4">
-        <h2 className="text-lg font-bold text-foreground">Inventory Platforms</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-bold text-foreground">Inventory Platforms</h2>
+          {loading && <RefreshCw className="h-4 w-4 text-muted-foreground animate-spin" />}
+          {crmData && !loading && (
+            <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">CRM Live</span>
+          )}
+        </div>
         <p className="text-sm text-muted-foreground">
           {isNHTTR
             ? "Breakdown service listings -- budget tracking and call performance"
