@@ -10,6 +10,7 @@ import { formatCurrency, formatNumber } from "@/lib/utils";
 import { DataSourceBadge } from "@/components/layout/data-source-badge";
 import { externalLinks } from "@/lib/external-links";
 import { useAccount } from "@/context/account-context";
+import { useDateRange } from "@/context/date-range-context";
 import { getPlatformsForAccount, type PlatformData } from "@/lib/inventory-platforms-data";
 import { format as fmtDate, differenceInDays, parseISO } from "date-fns";
 
@@ -23,7 +24,7 @@ interface CRMMonthEntry {
   byPlatform: Record<string, number>;
 }
 
-function useCRMPlatformLeads(accountId: string) {
+function useCRMPlatformLeads(accountId: string, startDate: string, endDate: string) {
   const [data, setData] = useState<CRMMonthEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -33,7 +34,7 @@ function useCRMPlatformLeads(accountId: string) {
 
     let cancelled = false;
     setLoading(true);
-    fetch("/api/inventory-platform-leads?months=7")
+    fetch(`/api/inventory-platform-leads?startDate=${startDate}&endDate=${endDate}`)
       .then((r) => r.json())
       .then((res) => {
         if (!cancelled && res.status === "live" && res.data) {
@@ -44,7 +45,7 @@ function useCRMPlatformLeads(accountId: string) {
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-  }, [accountId]);
+  }, [accountId, startDate, endDate]);
 
   return { data, loading };
 }
@@ -87,13 +88,16 @@ function getCurrentStats(p: PlatformData) {
   return { ...current, cpl, prevCpl, leadChange };
 }
 
-// ROI ranking
+// ROI ranking — platforms with 0 leads get worst score (they cost money but produce nothing)
 function getROIScores(platforms: PlatformData[]) {
   const stats = platforms.map((p) => ({ name: p.name, ...getCurrentStats(p) }));
-  const maxCpl = Math.max(...stats.map((s) => s.cpl));
+  // For CPL comparison, platforms with 0 leads get a very high CPL (worst case)
+  const effectiveCpl = stats.map((s) => s.leads > 0 ? s.cpl : Infinity);
+  const finiteCpls = effectiveCpl.filter((c) => isFinite(c));
+  const maxCpl = finiteCpls.length > 0 ? Math.max(...finiteCpls) : 1;
   return stats.map((s) => ({
     ...s,
-    roiScore: maxCpl > 0 ? Math.round((1 - s.cpl / maxCpl) * 100) : 0,
+    roiScore: s.leads === 0 ? 0 : (maxCpl > 0 ? Math.round((1 - s.cpl / maxCpl) * 100) : 0),
   })).sort((a, b) => b.roiScore - a.roiScore);
 }
 
@@ -589,9 +593,12 @@ function FullPlatformView({ platforms }: { platforms: PlatformData[] }) {
 
 export default function InventoryPlatformsPage() {
   const { currentAccount } = useAccount();
+  const { dateRange } = useDateRange();
   const staticPlatforms = getPlatformsForAccount(currentAccount.id);
   const isNHTTR = currentAccount.id === "nhttr";
-  const { data: crmData, loading } = useCRMPlatformLeads(currentAccount.id);
+  const startStr = fmtDate(dateRange.from, "yyyy-MM-dd");
+  const endStr = fmtDate(dateRange.to, "yyyy-MM-dd");
+  const { data: crmData, loading } = useCRMPlatformLeads(currentAccount.id, startStr, endStr);
 
   // Merge live CRM info-submit data with static platform config
   const platforms = useMemo(

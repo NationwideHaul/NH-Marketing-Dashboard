@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCRMSummary } from "@/lib/api-clients/nationwide-haul-crm";
-import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, parseISO, differenceInCalendarMonths } from "date-fns";
 
 /**
  * Maps CRM lead source names → inventory platform names.
@@ -31,14 +31,15 @@ const SOURCE_TO_PLATFORM: Record<string, string> = {
 };
 
 /**
- * GET /api/inventory-platform-leads?months=7
+ * GET /api/inventory-platform-leads?startDate=2026-01-01&endDate=2026-04-14
  *
- * Fetches CRM lead data per month and maps bySource to inventory platform names.
- * Returns an array of monthly entries with per-platform info submit counts.
+ * Fetches CRM lead data per month within the date range and maps bySource to inventory platform names.
+ * Also returns a "total" entry aggregating the entire range for the current-period view.
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const monthCount = Math.min(Number(searchParams.get("months") || "7"), 12);
+  const endDateStr = searchParams.get("endDate") || format(new Date(), "yyyy-MM-dd");
+  const startDateStr = searchParams.get("startDate") || format(subMonths(new Date(), 6), "yyyy-MM-dd");
 
   if (!process.env.NH_CRM_API_KEY) {
     return NextResponse.json({
@@ -49,16 +50,15 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const now = new Date();
-    const results: Array<{
-      month: string; // "Mar 26" format
-      monthKey: string; // "2026-03" format
-      byPlatform: Record<string, number>;
-    }> = [];
+    const startDate = parseISO(startDateStr);
+    const endDate = parseISO(endDateStr);
+    const monthSpan = Math.max(differenceInCalendarMonths(endDate, startDate), 0) + 1;
+    // Cap at 12 months to avoid excessive API calls
+    const monthCount = Math.min(monthSpan, 12);
 
-    // Fetch each month in parallel
+    // Build per-month ranges within the selected date range
     const monthPromises = Array.from({ length: monthCount }, (_, i) => {
-      const monthDate = subMonths(now, monthCount - 1 - i);
+      const monthDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
       const start = format(startOfMonth(monthDate), "yyyy-MM-dd");
       const end = format(endOfMonth(monthDate), "yyyy-MM-dd");
       const monthLabel = format(monthDate, "MMM yy");
@@ -70,7 +70,6 @@ export async function GET(request: NextRequest) {
       monthPromises.map(async ({ start, end, monthLabel, monthKey }) => {
         try {
           const data = await getCRMSummary(start, end);
-          // Map CRM sources to platform names
           const byPlatform: Record<string, number> = {};
           for (const [source, count] of Object.entries(data.leads.bySource)) {
             const platform = SOURCE_TO_PLATFORM[source];
