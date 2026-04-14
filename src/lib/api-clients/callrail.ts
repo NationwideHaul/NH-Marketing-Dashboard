@@ -75,8 +75,13 @@ export async function getCallSummary(
   endDate: string,
   companyId?: string
 ) {
-  const data = await getCalls(accountId, startDate, endDate, companyId);
-  const calls = data.calls || [];
+  // Fetch calls and all trackers in parallel
+  const [callData, trackerData] = await Promise.all([
+    getCalls(accountId, startDate, endDate, companyId),
+    getTrackingNumbers(accountId, companyId).catch(() => ({ trackers: [] })),
+  ]);
+  const calls = callData.calls || [];
+  const allTrackers: any[] = trackerData.trackers || []; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   const totalCalls = calls.length;
   const answered = calls.filter((c: any) => c.answered).length; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -94,8 +99,13 @@ export async function getCallSummary(
     sources[src] = (sources[src] || 0) + 1;
   });
 
-  // Tracker/source name breakdown (for inventory platforms -- which tracking number got the call)
+  // Tracker/source name breakdown — includes ALL configured trackers (even those with 0 calls)
   const trackerBreakdown: Record<string, number> = {};
+  // Seed with all tracker names at 0
+  allTrackers.forEach((t: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (t.name) trackerBreakdown[t.name] = 0;
+  });
+  // Count actual calls by source_name
   calls.forEach((c: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
     const tracker = c.source_name || c.tracking_phone_number || "Unknown";
     trackerBreakdown[tracker] = (trackerBreakdown[tracker] || 0) + 1;
