@@ -3,7 +3,7 @@
 import useSWR from "swr";
 import { useDateRange } from "@/context/date-range-context";
 import { useAccount } from "@/context/account-context";
-import { format, differenceInDays, subDays, subMonths } from "date-fns";
+import { format, differenceInDays, subDays } from "date-fns";
 import type { WidgetConfig } from "@/types/widget";
 import type { KPIMetric } from "@/types/kpi";
 
@@ -97,16 +97,11 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
 export function useWidgetTimeSeries(config: WidgetConfig): { date: string; value: number }[] {
   const { dateRange } = useDateRange();
   const { apiAccountId } = useAccount();
-  // Time-series charts default to 6 months so trends are readable.
-  // Dimension-based charts (e.g. Users by Channel) stay scoped to the selected date range.
-  const isTimeSeriesChart =
-    (config.type === "line-chart" || config.type === "area-chart" || config.type === "bar-chart") &&
-    !config.dimension;
+  // Use the user's selected date range for charts.
+  // Only override if config.trendMonths is explicitly set.
   const effectiveStart = config.trendMonths
     ? subDays(dateRange.to, config.trendMonths * 30)
-    : isTimeSeriesChart
-      ? subMonths(dateRange.to, 6)
-      : dateRange.from;
+    : dateRange.from;
   const startDate = format(effectiveStart, "yyyy-MM-dd");
   const endDate = format(dateRange.to, "yyyy-MM-dd");
   const route = getApiRoute(config.dataSource);
@@ -194,6 +189,64 @@ function extractMetric(apiResponse: any, metric: string, dataSource: string): nu
   if (apiResponse.platform === "youtube") {
     if (d[metric] !== undefined) return d[metric];
     return null;
+  }
+
+  // Google Ads format — array of searchStream results with daily metrics
+  if (dataSource === "google-ads" || apiResponse.platform === "google-ads") {
+    const rows = Array.isArray(d) ? d.flatMap((r: any) => r.results || []) : d.results || []; // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (rows.length > 0) {
+      const metricMap: Record<string, string> = {
+        spend: "costMicros",
+        clicks: "clicks",
+        impressions: "impressions",
+        ctr: "ctr",
+        conversions: "conversions",
+        cpc: "costMicros", // computed: spend / clicks
+        costPerConversion: "costPerConversion",
+      };
+      const apiField = metricMap[metric];
+      if (!apiField) return null;
+
+      if (metric === "ctr") {
+        let totalClicks = 0, totalImpressions = 0;
+        for (const row of rows) {
+          totalClicks += parseInt(row.metrics?.clicks || "0", 10);
+          totalImpressions += parseInt(row.metrics?.impressions || "0", 10);
+        }
+        return totalImpressions > 0 ? Math.round((totalClicks / totalImpressions) * 10000) / 100 : 0;
+      }
+
+      if (metric === "cpc") {
+        let totalCost = 0, totalClicks = 0;
+        for (const row of rows) {
+          totalCost += parseInt(row.metrics?.costMicros || "0", 10);
+          totalClicks += parseInt(row.metrics?.clicks || "0", 10);
+        }
+        return totalClicks > 0 ? Math.round((totalCost / totalClicks / 1_000_000) * 100) / 100 : 0;
+      }
+
+      if (metric === "spend") {
+        let total = 0;
+        for (const row of rows) total += parseInt(row.metrics?.costMicros || "0", 10);
+        return Math.round(total / 1_000_000 * 100) / 100;
+      }
+
+      if (metric === "costPerConversion") {
+        let totalCost = 0, totalConversions = 0;
+        for (const row of rows) {
+          totalCost += parseInt(row.metrics?.costMicros || "0", 10);
+          totalConversions += parseFloat(row.metrics?.conversions || "0");
+        }
+        return totalConversions > 0 ? Math.round((totalCost / totalConversions / 1_000_000) * 100) / 100 : 0;
+      }
+
+      // Sum-based metrics (clicks, impressions, conversions)
+      let total = 0;
+      for (const row of rows) {
+        total += parseFloat(row.metrics?.[apiField] || "0");
+      }
+      return Math.round(total * 100) / 100;
+    }
   }
 
   // Generic: try direct property access
@@ -361,6 +414,29 @@ function extractTimeSeries(apiResponse: any, metric: string): { date: string; va
       .sort((a, b) => a.date.localeCompare(b.date));
   }
 
+  // Google Ads: daily rows with segments.date and metrics
+  if (apiResponse.platform === "google-ads") {
+    const rows = Array.isArray(d) ? d.flatMap((r: any) => r.results || []) : d.results || []; // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (rows.length > 0) {
+      return rows.map((row: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        const date = row.segments?.date?.replace(/-/g, "") || "";
+        let value = 0;
+        if (metric === "spend") {
+          value = parseInt(row.metrics?.costMicros || "0", 10) / 1_000_000;
+        } else if (metric === "cpc") {
+          const cost = parseInt(row.metrics?.costMicros || "0", 10) / 1_000_000;
+          const clicks = parseInt(row.metrics?.clicks || "0", 10);
+          value = clicks > 0 ? cost / clicks : 0;
+        } else if (metric === "ctr") {
+          value = (row.metrics?.ctr || 0) * 100;
+        } else {
+          value = parseFloat(row.metrics?.[metric] || row.metrics?.clicks || "0");
+        }
+        return { date, value: Math.round(value * 100) / 100 };
+      }).filter((p: any) => p.date); // eslint-disable-line @typescript-eslint/no-explicit-any
+    }
+  }
+
   // Meta Social (Facebook/Instagram): pre-built daily time series from Page/IG Insights
   if (apiResponse.platform === "meta" && d && !d.data) {
     const seriesMap: Record<string, string> = {
@@ -415,6 +491,28 @@ function extractDimensionData(apiResponse: any, metric: string): { date: string;
 function extractAllMetrics(apiResponse: any, dataSource: string): KPIMetric[] { // eslint-disable-line @typescript-eslint/no-explicit-any
   const d = apiResponse.data;
   if (!d) return [];
+
+  // Google Ads
+  if (dataSource === "google-ads") {
+    const rows = Array.isArray(d) ? d.flatMap((r: any) => r.results || []) : d.results || []; // eslint-disable-line @typescript-eslint/no-explicit-any
+    let totalCost = 0, totalClicks = 0, totalImpressions = 0, totalConversions = 0;
+    for (const row of rows) {
+      totalCost += parseInt(row.metrics?.costMicros || "0", 10);
+      totalClicks += parseInt(row.metrics?.clicks || "0", 10);
+      totalImpressions += parseInt(row.metrics?.impressions || "0", 10);
+      totalConversions += parseFloat(row.metrics?.conversions || "0");
+    }
+    const spend = totalCost / 1_000_000;
+    return [
+      { id: "spend", label: "Cost (Spend)", value: Math.round(spend * 100) / 100, format: "currency" as const },
+      { id: "clicks", label: "Clicks", value: totalClicks, format: "number" as const },
+      { id: "impressions", label: "Impressions", value: totalImpressions, format: "number" as const },
+      { id: "ctr", label: "CTR", value: totalImpressions > 0 ? Math.round((totalClicks / totalImpressions) * 10000) / 100 : 0, format: "percent" as const },
+      { id: "cpc", label: "Avg. CPC", value: totalClicks > 0 ? Math.round((spend / totalClicks) * 100) / 100 : 0, format: "currency" as const },
+      { id: "conversions", label: "Conversions", value: Math.round(totalConversions), format: "number" as const },
+      { id: "costPerConversion", label: "Cost/Conversion", value: totalConversions > 0 ? Math.round((spend / totalConversions) * 100) / 100 : 0, format: "currency" as const },
+    ];
+  }
 
   // CallRail
   if (dataSource === "callrail") {
