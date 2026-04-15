@@ -272,11 +272,24 @@ function categorizeNHTTRTracker(name: string): string | null {
   return null; // skip unmatched
 }
 
-// Split tracker into RV vs TTR website
+// Explicit tracker → website mapping (case-sensitive, exact name match preferred)
+// Trackers not in either list are excluded from website breakdown.
+const RV_TRACKERS = new Set([
+  "GMB & Main Website (RV & Bus)",
+  "Google Ads (RV & Bus)",
+]);
+const TTR_TRACKERS = new Set([
+  "Truck Down",
+  "TruckDown",
+  "NTTS",
+  "NTTS Breakdown",
+  "Find Truck Service",
+  "Google Ads (NHTTR)",
+]);
+
 function trackerToWebsite(name: string): "rv" | "ttr" | null {
-  const n = name.toLowerCase();
-  if (n.includes("rv") || n.includes("bus")) return "rv";
-  if (n.includes("ttr") || n.includes("truck") || n.includes("trailer") || n.includes("macon") || n.includes("pompano")) return "ttr";
+  if (RV_TRACKERS.has(name)) return "rv";
+  if (TTR_TRACKERS.has(name)) return "ttr";
   return null;
 }
 
@@ -330,20 +343,31 @@ function NHTTROverviewHeader() {
     return () => { cancelled = true; };
   }, [start, end]);
 
-  // Live Info Submits from CRM (service-type leads)
-  const [totalInfoSubmits, setTotalInfoSubmits] = useState<number>(0);
+  // Live Info Submits from GA4 form_start events (per website property)
+  const [rvInfoSubmits, setRvInfoSubmits] = useState<number>(0);
+  const [ttrInfoSubmits, setTtrInfoSubmits] = useState<number>(0);
+
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/nationwide-haul-crm?metric=leads&startDate=${start}&endDate=${end}`)
-      .then((r) => r.json())
-      .then((res) => {
-        if (cancelled || res.status !== "live" || !res.data) return;
-        const serviceEntry = res.data.byType?.find((t: { type: string; count: number }) => t.type === "service");
-        setTotalInfoSubmits(serviceEntry?.count ?? 0);
-      })
-      .catch(() => {});
+    const fetchFormStarts = async (subAccountId: string): Promise<number> => {
+      const res = await fetch(`/api/google-analytics?startDate=${start}&endDate=${end}&accountId=${subAccountId}&dimension=eventName`).then((r) => r.json()).catch(() => null);
+      if (res?.status !== "live" || !res.data?.rows) return 0;
+      const formStartRow = res.data.rows.find((r: { dimensionValues: { value: string }[] }) =>
+        r.dimensionValues?.[0]?.value === "form_start"
+      );
+      if (!formStartRow) return 0;
+      return parseInt(formStartRow.metricValues?.[0]?.value || "0", 10);
+    };
+
+    Promise.all([fetchFormStarts("nhttr-rv"), fetchFormStarts("nhttr-ttr")]).then(([rv, ttr]) => {
+      if (cancelled) return;
+      setRvInfoSubmits(rv);
+      setTtrInfoSubmits(ttr);
+    });
     return () => { cancelled = true; };
   }, [start, end]);
+
+  const totalInfoSubmits = rvInfoSubmits + ttrInfoSubmits;
 
   const totalCalls = callData?.totalCalls ?? 0;
 
@@ -366,14 +390,12 @@ function NHTTROverviewHeader() {
   const inventoryPlatformCalls = callSources.filter((s) => ["NTTS", "Find Truck Service", "TruckDown"].includes(s.name));
   const inventoryTotal = inventoryPlatformCalls.reduce((sum, s) => sum + s.calls, 0);
 
-  // Per-website breakdown — calls split from CallRail, info submits split 60/40 as estimate
+  // Per-website breakdown — calls and info submits split exactly per source
   const rvCalls = callData?.rvCalls ?? 0;
   const ttrCalls = callData?.ttrCalls ?? 0;
-  const totalSplitCalls = rvCalls + ttrCalls;
-  const rvShare = totalSplitCalls > 0 ? rvCalls / totalSplitCalls : 0.5;
   const websiteBreakdown = [
-    { name: "RV & Bus Repair", website: "nhrvrepair.com", calls: rvCalls, infoSubmits: Math.round(totalInfoSubmits * rvShare), color: "#BE1E23" },
-    { name: "Truck & Trailer Repair", website: "nhtrucktrailerrepair.com", calls: ttrCalls, infoSubmits: totalInfoSubmits - Math.round(totalInfoSubmits * rvShare), color: "#8C0F14" },
+    { name: "RV & Bus Repair", website: "nhrvrepair.com", calls: rvCalls, infoSubmits: rvInfoSubmits, color: "#BE1E23" },
+    { name: "Truck & Trailer Repair", website: "nhtrucktrailerrepair.com", calls: ttrCalls, infoSubmits: ttrInfoSubmits, color: "#8C0F14" },
   ];
 
   return (
@@ -429,7 +451,7 @@ function NHTTROverviewHeader() {
             <span className="text-xs font-medium text-muted-foreground">Total Info Submits</span>
           </div>
           <p className="text-4xl font-bold text-foreground">{totalInfoSubmits}</p>
-          <p className="text-xs text-muted-foreground mt-1">Website forms and platform inquiries</p>
+          <p className="text-xs text-muted-foreground mt-1">From GA4 form interactions (both websites)</p>
         </div>
       </div>
 

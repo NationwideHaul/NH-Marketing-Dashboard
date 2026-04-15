@@ -5,7 +5,7 @@ import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
-import { Layers, TrendingUp, TrendingDown, Award, AlertTriangle, Calendar, DollarSign, Phone, RefreshCw } from "lucide-react";
+import { Layers, TrendingUp, TrendingDown, Award, AlertTriangle, Calendar, DollarSign, Phone, RefreshCw, Pencil } from "lucide-react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { DataSourceBadge } from "@/components/layout/data-source-badge";
 import { externalLinks } from "@/lib/external-links";
@@ -185,14 +185,39 @@ function useNHTTRInfoSubmits(startDate: string, endDate: string) {
 }
 
 // NHTTR-style view: calls per platform, expandable chart, editable budget, comparison table
-function NHTTRPlatformView({ platforms }: { platforms: PlatformData[] }) {
+function NHTTRPlatformView({ platforms: rawPlatforms }: { platforms: PlatformData[] }) {
+  const { currentAccount } = useAccount();
   const { dateRange } = useDateRange();
   const startStr = fmtDate(dateRange.from, "yyyy-MM-dd");
   const endStr = fmtDate(dateRange.to, "yyyy-MM-dd");
   const infoSubmits = useNHTTRInfoSubmits(startStr, endStr);
 
+  // Load persistent annual cost overrides from localStorage
+  const costStorageKey = `nh-platform-annual-cost-${currentAccount.id}`;
+  const [costOverrides, setCostOverrides] = useState<Record<string, number>>({});
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(costStorageKey);
+      if (raw) setCostOverrides(JSON.parse(raw));
+    } catch {}
+  }, [costStorageKey]);
+
+  // Apply overrides to platforms
+  const platforms = useMemo(
+    () => rawPlatforms.map((p) => ({ ...p, annualCost: costOverrides[p.name] ?? p.annualCost })),
+    [rawPlatforms, costOverrides],
+  );
+
+  const updateAnnualCost = (platformName: string, newCost: number) => {
+    const updated = { ...costOverrides, [platformName]: newCost };
+    setCostOverrides(updated);
+    localStorage.setItem(costStorageKey, JSON.stringify(updated));
+  };
+
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [editingPlatform, setEditingPlatform] = useState<string | null>(null);
+  const [editingCostFor, setEditingCostFor] = useState<string | null>(null);
+  const [costInput, setCostInput] = useState("");
   const [editValues, setEditValues] = useState<Record<string, { cost: string; date: string }>>({});
 
   const totalAnnual = platforms.reduce((sum, p) => sum + (p.annualCost || 0), 0);
@@ -422,7 +447,42 @@ function NHTTRPlatformView({ platforms }: { platforms: PlatformData[] }) {
                             <span className="font-medium text-card-foreground">{p.name}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-2.5 text-right">{formatCurrency(p.annualCost || 0)}</td>
+                        <td className="px-4 py-2.5 text-right">
+                          {editingCostFor === p.name ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <input
+                                type="number"
+                                min={0}
+                                value={costInput}
+                                onChange={(e) => setCostInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    const num = Number(costInput);
+                                    if (!isNaN(num) && num >= 0) updateAnnualCost(p.name, num);
+                                    setEditingCostFor(null);
+                                  }
+                                  if (e.key === "Escape") setEditingCostFor(null);
+                                }}
+                                onBlur={() => {
+                                  const num = Number(costInput);
+                                  if (!isNaN(num) && num >= 0) updateAnnualCost(p.name, num);
+                                  setEditingCostFor(null);
+                                }}
+                                autoFocus
+                                className="w-24 text-right text-sm bg-muted/50 border border-primary rounded px-1 py-0.5 outline-none"
+                              />
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => { setCostInput(String(p.annualCost || 0)); setEditingCostFor(p.name); }}
+                              className="hover:bg-muted rounded px-2 py-0.5 transition-colors group inline-flex items-center gap-1"
+                              title="Click to edit annual cost"
+                            >
+                              {formatCurrency(p.annualCost || 0)}
+                              <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
+                            </button>
+                          )}
+                        </td>
                         <td className="px-4 py-2.5 text-right font-bold">{calls}</td>
                         <td className="px-4 py-2.5 text-right">
                           <span className={change > 0 ? "text-green-600" : change < 0 ? "text-red-500" : "text-muted-foreground"}>
