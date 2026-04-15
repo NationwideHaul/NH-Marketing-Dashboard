@@ -7,7 +7,7 @@ import { useAccount } from "@/context/account-context";
 import { cn } from "@/lib/utils";
 
 // Pages where the sub-service toggle should be hidden (general view, not per-property)
-const HIDDEN_PAGES = ["/inventory-platforms", "/call-logs"];
+const HIDDEN_PAGES = ["/", "/inventory-platforms", "/call-logs"];
 
 export function SubServiceToggle() {
   const { currentAccount, activeSubService, setActiveSubService } = useAccount();
