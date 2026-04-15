@@ -259,20 +259,80 @@ function NFIOverviewHeader() {
 }
 
 // ==================== NHTTR OVERVIEW ====================
+
+// Categorize a CallRail tracker name into a high-level source category
+function categorizeNHTTRTracker(name: string): string | null {
+  const n = name.toLowerCase();
+  if (n.includes("ntts")) return "NTTS";
+  if (n.includes("find truck service")) return "Find Truck Service";
+  if (n.includes("truckdown") || n.includes("truck down")) return "TruckDown";
+  if (n.includes("gmb") || n.includes("google my business")) return "Google My Business";
+  if (n.includes("google ad")) return "Google Ads";
+  if (n.includes("website") || n.includes("rvrepair") || n.includes("trucktrailerrepair")) return "Websites";
+  return null; // skip unmatched
+}
+
+// Split tracker into RV vs TTR website
+function trackerToWebsite(name: string): "rv" | "ttr" | null {
+  const n = name.toLowerCase();
+  if (n.includes("rv") || n.includes("bus")) return "rv";
+  if (n.includes("ttr") || n.includes("truck") || n.includes("trailer") || n.includes("macon") || n.includes("pompano")) return "ttr";
+  return null;
+}
+
 function NHTTROverviewHeader() {
   const { activeSubService, currentAccount } = useAccount();
   const { dateRange } = useDateRange();
   const activeSub = currentAccount.subServices?.find((s) => s.id === activeSubService);
   const [summaryLoading, setSummaryLoading] = useState(false);
 
-  // Placeholder data -- will be replaced by real CallRail data from NH Repair Shops
-  const totalCalls = 59;
+  const start = dateRange.from.toISOString().slice(0, 10);
+  const end = dateRange.to.toISOString().slice(0, 10);
+
+  // Live CallRail data for NH Repair Shops
+  const [callData, setCallData] = useState<{
+    totalCalls: number;
+    sources: { name: string; calls: number }[];
+    rvCalls: number;
+    ttrCalls: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/callrail?startDate=${start}&endDate=${end}&accountId=nhttr`)
+      .then((r) => r.json())
+      .then((res) => {
+        if (cancelled || res.status !== "live" || !res.data) return;
+        const trackers: { tracker: string; count: number }[] = res.data.trackerBreakdown || [];
+        // Aggregate by category
+        const byCategory: Record<string, number> = {};
+        let rv = 0, ttr = 0;
+        for (const { tracker, count } of trackers) {
+          if (count === 0) continue;
+          const cat = categorizeNHTTRTracker(tracker);
+          if (cat) byCategory[cat] = (byCategory[cat] || 0) + count;
+          const site = trackerToWebsite(tracker);
+          if (site === "rv") rv += count;
+          else if (site === "ttr") ttr += count;
+        }
+        const orderedCategories = ["Google Ads", "Google My Business", "Websites", "NTTS", "Find Truck Service", "TruckDown"];
+        const sources = orderedCategories
+          .map((name) => ({ name, calls: byCategory[name] || 0 }))
+          .filter((s) => s.calls > 0);
+        setCallData({
+          totalCalls: res.data.totalCalls || 0,
+          sources,
+          rvCalls: rv,
+          ttrCalls: ttr,
+        });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [start, end]);
 
   // Live Info Submits from CRM (service-type leads)
   const [totalInfoSubmits, setTotalInfoSubmits] = useState<number>(0);
   useEffect(() => {
-    const start = dateRange.from.toISOString().slice(0, 10);
-    const end = dateRange.to.toISOString().slice(0, 10);
     let cancelled = false;
     fetch(`/api/nationwide-haul-crm?metric=leads&startDate=${start}&endDate=${end}`)
       .then((r) => r.json())
@@ -283,26 +343,38 @@ function NHTTROverviewHeader() {
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [dateRange.from, dateRange.to]);
+  }, [start, end]);
 
-  // Source breakdown for calls
-  const callSources = [
-    { name: "Google Ads", icon: MousePointerClick, calls: 22, color: "#BE1E23" },
-    { name: "Google My Business", icon: MapPin, calls: 14, color: "#8C0F14" },
-    { name: "Websites", icon: Globe, calls: 8, color: "#BE1E23" },
-    { name: "NTTS", icon: Layers, calls: 6, color: "#BE1E23" },
-    { name: "Find Truck Service", icon: Layers, calls: 5, color: "#D97706" },
-    { name: "TruckDown", icon: Layers, calls: 4, color: "#EA580C" },
-  ];
+  const totalCalls = callData?.totalCalls ?? 0;
 
-  // Per-website breakdown (calls + info submits)
-  const websiteBreakdown = [
-    { name: "RV & Bus Repair", website: "nhrvrepair.com", calls: 34, infoSubmits: 7, color: "#BE1E23" },
-    { name: "Truck & Trailer Repair", website: "nhtrucktrailerrepair.com", calls: 25, infoSubmits: 5, color: "#8C0F14" },
-  ];
+  // Icon & color mapping for call source categories
+  const ICON_MAP: Record<string, { icon: typeof MousePointerClick; color: string }> = {
+    "Google Ads": { icon: MousePointerClick, color: "#BE1E23" },
+    "Google My Business": { icon: MapPin, color: "#8C0F14" },
+    "Websites": { icon: Globe, color: "#BE1E23" },
+    "NTTS": { icon: Layers, color: "#BE1E23" },
+    "Find Truck Service": { icon: Layers, color: "#D97706" },
+    "TruckDown": { icon: Layers, color: "#EA580C" },
+  };
+  const callSources = (callData?.sources || []).map((s) => ({
+    name: s.name,
+    calls: s.calls,
+    icon: ICON_MAP[s.name]?.icon || Layers,
+    color: ICON_MAP[s.name]?.color || "#666",
+  }));
 
   const inventoryPlatformCalls = callSources.filter((s) => ["NTTS", "Find Truck Service", "TruckDown"].includes(s.name));
   const inventoryTotal = inventoryPlatformCalls.reduce((sum, s) => sum + s.calls, 0);
+
+  // Per-website breakdown — calls split from CallRail, info submits split 60/40 as estimate
+  const rvCalls = callData?.rvCalls ?? 0;
+  const ttrCalls = callData?.ttrCalls ?? 0;
+  const totalSplitCalls = rvCalls + ttrCalls;
+  const rvShare = totalSplitCalls > 0 ? rvCalls / totalSplitCalls : 0.5;
+  const websiteBreakdown = [
+    { name: "RV & Bus Repair", website: "nhrvrepair.com", calls: rvCalls, infoSubmits: Math.round(totalInfoSubmits * rvShare), color: "#BE1E23" },
+    { name: "Truck & Trailer Repair", website: "nhtrucktrailerrepair.com", calls: ttrCalls, infoSubmits: totalInfoSubmits - Math.round(totalInfoSubmits * rvShare), color: "#8C0F14" },
+  ];
 
   return (
     <>
@@ -331,7 +403,12 @@ function NHTTROverviewHeader() {
         ) : (
           <p className="text-sm text-card-foreground leading-relaxed">
             NH Repair Shops received <span className="font-bold">{totalCalls} calls</span> and <span className="font-bold">{totalInfoSubmits} info submits</span> this period.
-            Google Ads is the top call driver with {callSources[0].calls} calls. Inventory platforms generated {inventoryTotal} calls combined, with Find Truck Service leading at {inventoryPlatformCalls.find((s) => s.name === "Find Truck Service")?.calls || 0} calls.
+            {callSources.length > 0 && (
+              <> <span className="font-bold">{callSources[0].name}</span> is the top call driver with {callSources[0].calls} calls.</>
+            )}
+            {inventoryTotal > 0 && (
+              <> Inventory platforms generated {inventoryTotal} calls combined{inventoryPlatformCalls[0] ? `, with ${inventoryPlatformCalls[0].name} leading at ${inventoryPlatformCalls[0].calls} calls` : ""}.</>
+            )}
           </p>
         )}
       </div>
