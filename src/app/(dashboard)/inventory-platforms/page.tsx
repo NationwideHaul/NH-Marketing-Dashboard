@@ -192,26 +192,36 @@ function NHTTRPlatformView({ platforms: rawPlatforms }: { platforms: PlatformDat
   const endStr = fmtDate(dateRange.to, "yyyy-MM-dd");
   const infoSubmits = useNHTTRInfoSubmits(startStr, endStr);
 
-  // Load persistent annual cost overrides from localStorage
-  const costStorageKey = `nh-platform-annual-cost-${currentAccount.id}`;
-  const [costOverrides, setCostOverrides] = useState<Record<string, number>>({});
+  // Load persistent annual cost + renewal date overrides from localStorage
+  const overrideStorageKey = `nh-platform-overrides-${currentAccount.id}`;
+  const [overrides, setOverrides] = useState<Record<string, { annualCost?: number; renewalDate?: string }>>({});
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(costStorageKey);
-      if (raw) setCostOverrides(JSON.parse(raw));
+      const raw = localStorage.getItem(overrideStorageKey);
+      if (raw) setOverrides(JSON.parse(raw));
     } catch {}
-  }, [costStorageKey]);
+  }, [overrideStorageKey]);
 
   // Apply overrides to platforms
   const platforms = useMemo(
-    () => rawPlatforms.map((p) => ({ ...p, annualCost: costOverrides[p.name] ?? p.annualCost })),
-    [rawPlatforms, costOverrides],
+    () => rawPlatforms.map((p) => ({
+      ...p,
+      annualCost: overrides[p.name]?.annualCost ?? p.annualCost,
+      renewalDate: overrides[p.name]?.renewalDate ?? p.renewalDate,
+    })),
+    [rawPlatforms, overrides],
   );
 
   const updateAnnualCost = (platformName: string, newCost: number) => {
-    const updated = { ...costOverrides, [platformName]: newCost };
-    setCostOverrides(updated);
-    localStorage.setItem(costStorageKey, JSON.stringify(updated));
+    const updated = { ...overrides, [platformName]: { ...overrides[platformName], annualCost: newCost } };
+    setOverrides(updated);
+    localStorage.setItem(overrideStorageKey, JSON.stringify(updated));
+  };
+
+  const updatePlatform = (platformName: string, fields: { annualCost?: number; renewalDate?: string }) => {
+    const updated = { ...overrides, [platformName]: { ...overrides[platformName], ...fields } };
+    setOverrides(updated);
+    localStorage.setItem(overrideStorageKey, JSON.stringify(updated));
   };
 
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
@@ -335,7 +345,20 @@ function NHTTRPlatformView({ platforms: rawPlatforms }: { platforms: PlatformDat
                         />
                       </div>
                       <button
-                        onClick={(e) => { e.stopPropagation(); setEditingPlatform(null); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const v = editValues[p.name];
+                          const fields: { annualCost?: number; renewalDate?: string } = {};
+                          if (v?.cost !== undefined) {
+                            const num = Number(v.cost);
+                            if (!isNaN(num) && num >= 0) fields.annualCost = num;
+                          }
+                          if (v?.date !== undefined) {
+                            fields.renewalDate = v.date || undefined;
+                          }
+                          if (Object.keys(fields).length > 0) updatePlatform(p.name, fields);
+                          setEditingPlatform(null);
+                        }}
                         className="w-full py-1 text-xs bg-primary text-white rounded-md hover:bg-primary/90"
                       >
                         Save
