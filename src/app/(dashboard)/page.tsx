@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sparkles, RefreshCw, Truck, Phone, FileText, Globe, MapPin, MousePointerClick, Layers, TrendingUp, Lightbulb, Star } from "lucide-react";
 import { WidgetPage } from "@/components/widgets/widget-page";
 import { useAccount } from "@/context/account-context";
+import { useDateRange } from "@/context/date-range-context";
 
 // ==================== NH OVERVIEW ====================
 
@@ -260,12 +261,29 @@ function NFIOverviewHeader() {
 // ==================== NHTTR OVERVIEW ====================
 function NHTTROverviewHeader() {
   const { activeSubService, currentAccount } = useAccount();
+  const { dateRange } = useDateRange();
   const activeSub = currentAccount.subServices?.find((s) => s.id === activeSubService);
   const [summaryLoading, setSummaryLoading] = useState(false);
 
   // Placeholder data -- will be replaced by real CallRail data from NH Repair Shops
   const totalCalls = 59;
-  const totalInfoSubmits = 12;
+
+  // Live Info Submits from CRM (service-type leads)
+  const [totalInfoSubmits, setTotalInfoSubmits] = useState<number>(0);
+  useEffect(() => {
+    const start = dateRange.from.toISOString().slice(0, 10);
+    const end = dateRange.to.toISOString().slice(0, 10);
+    let cancelled = false;
+    fetch(`/api/nationwide-haul-crm?metric=leads&startDate=${start}&endDate=${end}`)
+      .then((r) => r.json())
+      .then((res) => {
+        if (cancelled || res.status !== "live" || !res.data) return;
+        const serviceEntry = res.data.byType?.find((t: { type: string; count: number }) => t.type === "service");
+        setTotalInfoSubmits(serviceEntry?.count ?? 0);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [dateRange.from, dateRange.to]);
 
   // Source breakdown for calls
   const callSources = [
