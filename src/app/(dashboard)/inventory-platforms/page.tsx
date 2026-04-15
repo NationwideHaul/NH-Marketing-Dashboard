@@ -164,8 +164,33 @@ function daysUntilRenewal(renewalDate?: string): number | null {
   return differenceInDays(parseISO(renewalDate), new Date());
 }
 
+// Hook: fetch CRM service lead count for NHTTR info submits
+function useNHTTRInfoSubmits(startDate: string, endDate: string) {
+  const [count, setCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/nationwide-haul-crm?metric=leads&startDate=${startDate}&endDate=${endDate}`)
+      .then((r) => r.json())
+      .then((res) => {
+        if (cancelled || res.status !== "live" || !res.data) return;
+        const serviceEntry = res.data.byType?.find((t: { type: string; count: number }) => t.type === "service");
+        setCount(serviceEntry?.count ?? 0);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [startDate, endDate]);
+
+  return count;
+}
+
 // NHTTR-style view: calls per platform, expandable chart, editable budget, comparison table
 function NHTTRPlatformView({ platforms }: { platforms: PlatformData[] }) {
+  const { dateRange } = useDateRange();
+  const startStr = fmtDate(dateRange.from, "yyyy-MM-dd");
+  const endStr = fmtDate(dateRange.to, "yyyy-MM-dd");
+  const infoSubmits = useNHTTRInfoSubmits(startStr, endStr);
+
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [editingPlatform, setEditingPlatform] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, { cost: string; date: string }>>({});
@@ -195,17 +220,27 @@ function NHTTRPlatformView({ platforms }: { platforms: PlatformData[] }) {
 
   return (
     <div>
-      {/* Total Budget Banner */}
-      <div className="rounded-lg border border-border bg-card p-4 mb-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground font-medium">Total Annual Budget</p>
-            <p className="text-2xl font-bold text-foreground">{formatCurrency(totalAnnual)}<span className="text-sm font-normal text-muted-foreground">/year</span></p>
+      {/* Top Stats Banner */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground font-medium">Total Annual Budget</p>
+          <p className="text-2xl font-bold text-foreground">{formatCurrency(totalAnnual)}<span className="text-sm font-normal text-muted-foreground">/year</span></p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-xs text-muted-foreground font-medium">Calls This Month</p>
+          <p className="text-2xl font-bold text-foreground">{platforms.reduce((sum, p) => sum + getCurrentCalls(p), 0)}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs text-muted-foreground font-medium">Website Info Submits</p>
+            {infoSubmits !== null && (
+              <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">CRM Live</span>
+            )}
           </div>
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground font-medium">Calls This Month</p>
-            <p className="text-2xl font-bold text-foreground">{platforms.reduce((sum, p) => sum + getCurrentCalls(p), 0)}</p>
-          </div>
+          <p className="text-2xl font-bold text-foreground">
+            {infoSubmits === null ? <span className="text-muted-foreground">—</span> : formatNumber(infoSubmits)}
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Service leads from nhtrucktrailerrepair.com</p>
         </div>
       </div>
 
