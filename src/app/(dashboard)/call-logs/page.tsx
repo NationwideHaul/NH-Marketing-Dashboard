@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import useSWR from "swr";
 import { format } from "date-fns";
 import {
@@ -32,26 +32,64 @@ function StatCard({ icon: Icon, label, value, subtitle, color = "text-card-foreg
   );
 }
 
-// Mock agent data -- will be replaced by real RingCentral API data
-const mockAgents = [
-  { id: "1", name: "Carlos Martinez", extension: "101", inbound: 45, outbound: 62, answered: 42, missed: 3, avgDuration: "3:24" },
-  { id: "2", name: "Jessica Ramirez", extension: "102", inbound: 38, outbound: 47, answered: 36, missed: 2, avgDuration: "4:12" },
-  { id: "3", name: "David Johnson", extension: "103", inbound: 29, outbound: 55, answered: 28, missed: 1, avgDuration: "2:48" },
-  { id: "4", name: "Maria Garcia", extension: "104", inbound: 22, outbound: 31, answered: 20, missed: 2, avgDuration: "3:55" },
-  { id: "5", name: "Robert Lee", extension: "105", inbound: 18, outbound: 24, answered: 16, missed: 2, avgDuration: "3:10" },
-];
+interface Agent {
+  id: string;
+  name: string;
+  extension: string;
+  inbound: number;
+  outbound: number;
+  answered: number;
+  missed: number;
+  avgDuration: string;
+}
 
 function AgentCallsTab() {
-  const { currentAccount } = useAccount();
-  const COLORS = currentAccount.chartPalette;
+  const { currentAccount, apiAccountId } = useAccount();
+  const { dateRange } = useDateRange();
+  const startDate = format(dateRange.from, "yyyy-MM-dd");
+  const endDate = format(dateRange.to, "yyyy-MM-dd");
   const positiveColor = currentAccount.positiveColor;
   const primary = currentAccount.colors.primary;
 
-  const [selectedAgents, setSelectedAgents] = useState<string[]>(mockAgents.map((a) => a.id));
+  const { data, isLoading, error } = useSWR(
+    `/api/call-logs?source=ringcentral&startDate=${startDate}&endDate=${endDate}&accountId=${apiAccountId}`,
+    fetcher
+  );
+
+  // Map RingCentral agent stats to the shape the UI expects
+  const agents: Agent[] = (data?.data?.ringcentral?.agents || []).map((a: {
+    extensionId: string;
+    extensionNumber: string;
+    name: string;
+    inbound: number;
+    outbound: number;
+    answered: number;
+    missed: number;
+    avgDuration: string;
+  }) => ({
+    id: a.extensionId,
+    name: a.name,
+    extension: a.extensionNumber,
+    inbound: a.inbound,
+    outbound: a.outbound,
+    answered: a.answered,
+    missed: a.missed,
+    avgDuration: a.avgDuration,
+  }));
+
+  const ringcentralError = data?.data?.ringcentral?.error;
+
+  const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
   const [directionFilter, setDirectionFilter] = useState<"all" | "inbound" | "outbound">("all");
 
-  const filteredAgents = mockAgents.filter((a) => selectedAgents.includes(a.id));
+  // Sync selected agents whenever the agent list changes (new date range / account switch)
+  useEffect(() => {
+    setSelectedAgents(agents.map((a) => a.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agents.length, apiAccountId, startDate, endDate]);
+
+  const filteredAgents = agents.filter((a) => selectedAgents.includes(a.id));
 
   const toggleAgent = (id: string) => {
     setSelectedAgents((prev) =>
@@ -81,7 +119,7 @@ function AgentCallsTab() {
             className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-card text-sm hover:bg-muted/30 transition-colors"
           >
             <Users className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium">{selectedAgents.length} of {mockAgents.length} agents</span>
+            <span className="font-medium">{selectedAgents.length} of {agents.length} agents</span>
             <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground transition-transform", showAgentDropdown && "rotate-180")} />
           </button>
 
@@ -89,13 +127,13 @@ function AgentCallsTab() {
             <div className="absolute z-20 top-full left-0 mt-1 w-72 rounded-xl border border-border bg-card shadow-lg overflow-hidden">
               <div className="p-2 border-b border-border">
                 <button
-                  onClick={() => setSelectedAgents(selectedAgents.length === mockAgents.length ? [] : mockAgents.map((a) => a.id))}
+                  onClick={() => setSelectedAgents(selectedAgents.length === agents.length ? [] : agents.map((a) => a.id))}
                   className="text-xs text-primary font-medium hover:underline"
                 >
-                  {selectedAgents.length === mockAgents.length ? "Deselect all" : "Select all"}
+                  {selectedAgents.length === agents.length ? "Deselect all" : "Select all"}
                 </button>
               </div>
-              {mockAgents.map((agent) => {
+              {agents.map((agent) => {
                 const isSelected = selectedAgents.includes(agent.id);
                 return (
                   <button
@@ -138,6 +176,23 @@ function AgentCallsTab() {
           ))}
         </div>
       </div>
+
+      {/* Loading / empty / error states */}
+      {isLoading && (
+        <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground mb-4">
+          Loading RingCentral agent data…
+        </div>
+      )}
+      {!isLoading && (error || ringcentralError) && (
+        <div className="rounded-lg border border-red-500/40 bg-red-500/5 p-8 text-center text-sm text-red-600 dark:text-red-400 mb-4">
+          Unable to load RingCentral data: {ringcentralError || (error as Error)?.message || "unknown error"}
+        </div>
+      )}
+      {!isLoading && !ringcentralError && agents.length === 0 && (
+        <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground mb-4">
+          No agent activity in the selected period. Check your RingCentral connection in Settings.
+        </div>
+      )}
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">

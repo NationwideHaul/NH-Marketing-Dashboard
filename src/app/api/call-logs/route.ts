@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { format, subDays } from "date-fns";
-import { getCallAnalytics } from "@/lib/api-clients/ringcentral";
+import { getCallAnalytics, getAgentCallStats } from "@/lib/api-clients/ringcentral";
 import { listAccounts, getCallSummary, getCalls, findCompanyId, getTrackingNumbers } from "@/lib/api-clients/callrail";
 import { getAccountCredentials } from "@/lib/account-credentials";
 
@@ -24,11 +24,16 @@ export async function GET(request: NextRequest) {
   // ===== RINGCENTRAL =====
   if ((source === "all" || source === "ringcentral") && process.env.RINGCENTRAL_CLIENT_ID) {
     try {
-      const rcData = await getCallAnalytics(
-        new Date(startDate).toISOString(),
-        new Date(endDate + "T23:59:59").toISOString()
-      );
-      result.data.ringcentral = rcData;
+      const fromIso = new Date(startDate).toISOString();
+      const toIso = new Date(endDate + "T23:59:59").toISOString();
+      const [rcData, agents] = await Promise.all([
+        getCallAnalytics(fromIso, toIso),
+        getAgentCallStats(fromIso, toIso).catch((e) => {
+          console.error("RingCentral agents error:", e.message);
+          return [];
+        }),
+      ]);
+      result.data.ringcentral = { ...rcData, agents };
     } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
       result.data.ringcentral = { error: error.message };
     }
