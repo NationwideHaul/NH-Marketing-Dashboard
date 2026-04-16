@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const endDate = searchParams.get("endDate") || "2025-12-31";
   const accountId = searchParams.get("accountId") || "nationwide-haul";
 
-  const creds = getAccountCredentials(accountId);
+  const creds = await getAccountCredentials(accountId);
   const customerId = creds.googleAdsCustomerId;
 
   if (!customerId || !creds.googleAdsDeveloperToken) {

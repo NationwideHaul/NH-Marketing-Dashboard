@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   const accountId = searchParams.get("accountId") || "nationwide-haul";
   const dimension = searchParams.get("dimension") || undefined;
 
-  const creds = getAccountCredentials(accountId);
+  const creds = await getAccountCredentials(accountId);
   const propertyId = creds.ga4PropertyId;
 
   if (!propertyId || !process.env.GOOGLE_CLIENT_ID) {

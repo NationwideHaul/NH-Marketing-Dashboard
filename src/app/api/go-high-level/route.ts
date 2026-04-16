@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const startDate = searchParams.get("startDate");
   const endDate = searchParams.get("endDate");
 
-  const creds = getAccountCredentials(accountId);
+  const creds = await getAccountCredentials(accountId);
   const apiKey = creds.ghlApiKey;
   const locationId = creds.ghlLocationId;
 

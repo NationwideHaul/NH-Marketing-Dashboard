@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Get credentials for this dashboard account — includes company ID
-  const creds = getAccountCredentials(dashboardAccountId);
+  const creds = await getAccountCredentials(dashboardAccountId);
   const companyId = creds.callrailCompanyId;
   const companyName = creds.callrailCompanyName || dashboardAccountId;
 

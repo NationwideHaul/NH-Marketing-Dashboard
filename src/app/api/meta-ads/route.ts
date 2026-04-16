@@ -234,7 +234,7 @@ export async function GET(request: NextRequest) {
   const until = searchParams.get("until") || searchParams.get("endDate") || "";
   const accountId = searchParams.get("accountId") || "nationwide-haul";
 
-  const creds = getAccountCredentials(accountId);
+  const creds = await getAccountCredentials(accountId);
   const accessToken = creds.metaAccessToken;
 
   if (!accessToken) {

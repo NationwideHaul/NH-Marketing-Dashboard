@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const dashboardAccountId = searchParams.get("accountId") || "nationwide-haul";
 
   // Get company name for this dashboard account
-  const creds = getAccountCredentials(dashboardAccountId);
+  const creds = await getAccountCredentials(dashboardAccountId);
   const companyName = creds.callrailCompanyName || "Nationwide Haul";
 
   const result: any = { platform: "call-logs", status: "live", companyName, data: {} }; // eslint-disable-line @typescript-eslint/no-explicit-any

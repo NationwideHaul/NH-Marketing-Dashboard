@@ -1,15 +1,20 @@
 // Server-side account credentials mapping
 // This file is ONLY used in API routes (server-side)
 // Each account has its own set of API credentials
+//
+// Resolution order for every string field:
+//   1. Per-account KV override   (cred:account:<accountId>:<field>)
+//   2. Global KV override        (cred:<ENV_VAR>)
+//   3. Per-account env var       (e.g. GHL_API_KEY_NATIONWIDE_HAUL)
+//   4. Global env var            (e.g. GHL_API_KEY)
+//   5. Hardcoded static default  (in STATIC_CREDENTIALS below)
 
-// Read env var and strip whitespace (newlines, tabs, spaces) that
-// commonly slip in when pasting secrets into the Vercel UI.
-const env = new Proxy({} as Record<string, string | undefined>, {
-  get: (_, key: string) => {
-    const v = process.env[key];
-    return typeof v === "string" ? v.trim() : v;
-  },
-});
+import { getAccountCredential, getCredential } from "@/lib/credential-store";
+
+function trimEnv(key: string): string {
+  const v = process.env[key];
+  return typeof v === "string" ? v.trim() : "";
+}
 
 export interface GMBLocation {
   id: string;
@@ -35,37 +40,37 @@ export interface AccountCredentials {
   gmbLocations?: GMBLocation[];
 }
 
-const accountCredentials: Record<string, AccountCredentials> = {
+// Static data — hardcoded defaults per account. Resolution falls back to these
+// when neither KV nor env vars provide a value.
+interface StaticAccountCredentials extends AccountCredentials {
+  /** Env var suffix for per-account GHL API key, e.g. "NATIONWIDE_HAUL" */
+  ghlApiKeyEnvSuffix?: string;
+}
+
+const STATIC_CREDENTIALS: Record<string, StaticAccountCredentials> = {
   "nationwide-haul": {
     ga4PropertyId: "333711970",
     googleAdsCustomerId: "4504773990",
-    googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "Nationwide Haul",
     callrailCompanyId: "901305667",
-    ghlLocationId: env.GHL_LOCATION_ID || "IEs4Gwg925sPu0AYNpdS",
-    ghlApiKey: env.GHL_API_KEY_NATIONWIDE_HAUL || env.GHL_API_KEY,
-    metaAdAccountId: env.META_AD_ACCOUNT_ID,
-    metaAccessToken: env.META_ACCESS_TOKEN,
-    metaPageId: env.META_PAGE_ID,
-    metaIgUserId: env.META_IG_USER_ID,
+    ghlLocationId: "IEs4Gwg925sPu0AYNpdS",
+    ghlApiKeyEnvSuffix: "NATIONWIDE_HAUL",
     youtubeChannelId: "UCjWMfLksDwfwVA-u3xkhnhg",
     ringcentralEnabled: true,
   },
   "nfi-truck-sales": {
     ga4PropertyId: "354503352",
     googleAdsCustomerId: "4307362539",
-    googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "NFI Truck Sales",
     callrailCompanyId: "182573673",
     ghlLocationId: "bQFOVHhca9fD7V3faeS1",
-    ghlApiKey: env.GHL_API_KEY_NFI || env.GHL_API_KEY,
+    ghlApiKeyEnvSuffix: "NFI",
     ringcentralEnabled: true,
   },
   "nhttr": {
     // Default to RV — toggle handled by subService param
     ga4PropertyId: "528221425",
     googleAdsCustomerId: "1073209892",
-    googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "NH Repair Shops",
     callrailCompanyId: "682402393",
     ringcentralEnabled: true,
@@ -87,7 +92,6 @@ const accountCredentials: Record<string, AccountCredentials> = {
   "nhttr-rv": {
     ga4PropertyId: "528221425",
     googleAdsCustomerId: "1073209892",
-    googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "NH Repair Shops",
     callrailCompanyId: "682402393",
     ringcentralEnabled: true,
@@ -103,7 +107,6 @@ const accountCredentials: Record<string, AccountCredentials> = {
   "nhttr-ttr": {
     ga4PropertyId: "528269534",
     googleAdsCustomerId: "6515085474",
-    googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "NH Repair Shops",
     callrailCompanyId: "682402393",
     ringcentralEnabled: true,
@@ -119,14 +122,138 @@ const accountCredentials: Record<string, AccountCredentials> = {
   "road-ready": {
     ga4PropertyId: "350112166",
     googleAdsCustomerId: "1866416925",
-    googleAdsDeveloperToken: env.GOOGLE_ADS_DEVELOPER_TOKEN,
     callrailCompanyName: "Complete Carrier Coverage/Road Ready",
     callrailCompanyId: "753432103",
     ghlLocationId: "PEN2IZLLlQwf1PpQJhyx",
-    ghlApiKey: env.GHL_API_KEY_ROAD_READY || env.GHL_API_KEY,
+    ghlApiKeyEnvSuffix: "ROAD_READY",
   },
 };
 
-export function getAccountCredentials(accountId: string): AccountCredentials {
-  return accountCredentials[accountId] || accountCredentials["nationwide-haul"];
+/** Per-account resolver: KV(account:field) → fallbackValue. */
+async function resolvePerAccount(
+  accountId: string,
+  field: keyof AccountCredentials,
+  fallbackValue?: string
+): Promise<string | undefined> {
+  const r = await getAccountCredential(accountId, field as string, {
+    fallbackValue,
+  });
+  return r.value || undefined;
+}
+
+/** Global env var resolver: KV(envVar) → process.env[envVar]. */
+async function resolveGlobalEnv(envVar: string): Promise<string | undefined> {
+  const r = await getCredential(envVar);
+  return r.value || undefined;
+}
+
+/**
+ * Resolves a field that has BOTH a per-account KV path and a global env var
+ * fallback. Examples: metaAccessToken, ghlLocationId (when env GHL_LOCATION_ID
+ * is set for NH).
+ */
+async function resolveBoth(
+  accountId: string,
+  field: keyof AccountCredentials,
+  globalEnvVar: string,
+  hardcodedFallback?: string
+): Promise<string | undefined> {
+  // KV per-account first
+  const perAcct = await getAccountCredential(accountId, field as string);
+  if (perAcct.source !== "missing") return perAcct.value;
+  // Global KV → process.env
+  const globalVal = await resolveGlobalEnv(globalEnvVar);
+  if (globalVal) return globalVal;
+  return hardcodedFallback && hardcodedFallback.trim() ? hardcodedFallback.trim() : undefined;
+}
+
+export async function getAccountCredentials(
+  accountId: string
+): Promise<AccountCredentials> {
+  const staticCreds =
+    STATIC_CREDENTIALS[accountId] || STATIC_CREDENTIALS["nationwide-haul"];
+
+  // Resolve GHL API key — per-account KV → per-account env (GHL_API_KEY_*) → global GHL_API_KEY
+  const ghlApiKey = await (async (): Promise<string | undefined> => {
+    const perAcct = await getAccountCredential(accountId, "ghlApiKey");
+    if (perAcct.source !== "missing") return perAcct.value;
+    if (staticCreds.ghlApiKeyEnvSuffix) {
+      const perAcctEnvKey = `GHL_API_KEY_${staticCreds.ghlApiKeyEnvSuffix}`;
+      const v = await resolveGlobalEnv(perAcctEnvKey);
+      if (v) return v;
+    }
+    const globalV = await resolveGlobalEnv("GHL_API_KEY");
+    return globalV || undefined;
+  })();
+
+  const [
+    ga4PropertyId,
+    googleAdsCustomerId,
+    googleAdsDeveloperToken,
+    callrailCompanyName,
+    callrailCompanyId,
+    ghlLocationId,
+    metaAdAccountId,
+    metaAccessToken,
+    metaPageId,
+    metaIgUserId,
+    youtubeChannelId,
+  ] = await Promise.all([
+    resolvePerAccount(accountId, "ga4PropertyId", staticCreds.ga4PropertyId),
+    resolvePerAccount(accountId, "googleAdsCustomerId", staticCreds.googleAdsCustomerId),
+    resolveGlobalEnv("GOOGLE_ADS_DEVELOPER_TOKEN"),
+    resolvePerAccount(accountId, "callrailCompanyName", staticCreds.callrailCompanyName),
+    resolvePerAccount(accountId, "callrailCompanyId", staticCreds.callrailCompanyId),
+    resolveBoth(accountId, "ghlLocationId", "GHL_LOCATION_ID", staticCreds.ghlLocationId),
+    resolveBoth(accountId, "metaAdAccountId", "META_AD_ACCOUNT_ID", staticCreds.metaAdAccountId),
+    resolveGlobalEnv("META_ACCESS_TOKEN"),
+    resolveBoth(accountId, "metaPageId", "META_PAGE_ID", staticCreds.metaPageId),
+    resolveBoth(accountId, "metaIgUserId", "META_IG_USER_ID", staticCreds.metaIgUserId),
+    resolvePerAccount(accountId, "youtubeChannelId", staticCreds.youtubeChannelId),
+  ]);
+
+  return {
+    ga4PropertyId,
+    googleAdsCustomerId,
+    googleAdsDeveloperToken,
+    callrailCompanyName,
+    callrailCompanyId,
+    ghlLocationId,
+    ghlApiKey,
+    metaAdAccountId,
+    metaAccessToken,
+    metaPageId,
+    metaIgUserId,
+    youtubeChannelId,
+    ringcentralEnabled: staticCreds.ringcentralEnabled,
+    gmbLocations: staticCreds.gmbLocations,
+  };
+}
+
+/**
+ * Synchronous, env+static only. For the Settings status page and other
+ * read-only callers that can't yet be made async. Does NOT consult KV.
+ */
+export function getAccountCredentialsSync(accountId: string): AccountCredentials {
+  const staticCreds =
+    STATIC_CREDENTIALS[accountId] || STATIC_CREDENTIALS["nationwide-haul"];
+  const ghlKeyFromPerAcctEnv = staticCreds.ghlApiKeyEnvSuffix
+    ? trimEnv(`GHL_API_KEY_${staticCreds.ghlApiKeyEnvSuffix}`)
+    : "";
+  return {
+    ga4PropertyId: staticCreds.ga4PropertyId,
+    googleAdsCustomerId: staticCreds.googleAdsCustomerId,
+    googleAdsDeveloperToken: trimEnv("GOOGLE_ADS_DEVELOPER_TOKEN") || undefined,
+    callrailCompanyName: staticCreds.callrailCompanyName,
+    callrailCompanyId: staticCreds.callrailCompanyId,
+    ghlLocationId: staticCreds.ghlLocationId || trimEnv("GHL_LOCATION_ID") || undefined,
+    ghlApiKey: ghlKeyFromPerAcctEnv || trimEnv("GHL_API_KEY") || undefined,
+    metaAdAccountId: trimEnv("META_AD_ACCOUNT_ID") || staticCreds.metaAdAccountId,
+    metaAccessToken: trimEnv("META_ACCESS_TOKEN") || undefined,
+    metaPageId: trimEnv("META_PAGE_ID") || undefined,
+    metaIgUserId: trimEnv("META_IG_USER_ID") || undefined,
+    youtubeChannelId: staticCreds.youtubeChannelId,
+    ringcentralEnabled: staticCreds.ringcentralEnabled,
+    gmbLocations: staticCreds.gmbLocations,
+  };
 }

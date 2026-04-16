@@ -265,7 +265,7 @@ export function getPerAccountConnection(id: string): PerAccountConnectionDef | u
 // Reads credentials from the store (KV with env fallback).
 
 import { getAccount } from "./accounts";
-import { getAccountCredentials } from "./account-credentials";
+import { getAccountCredentialsSync } from "./account-credentials";
 import {
   getAccountCredential,
   getCredential,
@@ -408,7 +408,7 @@ function accountConfigValue(accountId: string, field: string): string {
 
   // Secondary fallback: account-credentials.ts has richer static config
   // (callrail company IDs, IG user IDs when env-var isn't set, etc.).
-  const creds = getAccountCredentials(accountId) as unknown as Record<string, unknown>;
+  const creds = getAccountCredentialsSync(accountId) as unknown as Record<string, unknown>;
   const credVal = creds?.[field];
   return typeof credVal === "string" ? credVal : "";
 }

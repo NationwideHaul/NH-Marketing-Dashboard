@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get("type") || "overview";
   const accountId = searchParams.get("accountId") || "nationwide-haul";
 
-  const creds = getAccountCredentials(accountId);
+  const creds = await getAccountCredentials(accountId);
   const channelId = creds.youtubeChannelId;
 
   if (!channelId) {

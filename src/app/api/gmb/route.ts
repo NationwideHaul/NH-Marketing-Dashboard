@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   const accountId = searchParams.get("accountId") || "nationwide-haul";
   const locationIdParam = searchParams.get("locationId");
 
-  const creds = getAccountCredentials(accountId);
+  const creds = await getAccountCredentials(accountId);
 
   let locationId = locationIdParam;
   const accountIdForGmb = process.env.GMB_ACCOUNT_ID;
