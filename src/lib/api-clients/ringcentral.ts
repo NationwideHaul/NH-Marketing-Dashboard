@@ -193,14 +193,17 @@ export async function getAgentCallStats(
   dateTo: string
 ): Promise<AgentCallStat[]> {
   const { token, baseUrl } = await getAccessToken();
-  const [records, extensions] = await Promise.all([
-    fetchDetailedCallLog(dateFrom, dateTo, token, baseUrl),
-    listExtensions().catch(() => [] as Array<{ id: string; extensionNumber: string; name: string }>),
-  ]);
+  // Fetch extensions first so concurrent calls still get a cached token.
+  const extensions = await listExtensions().catch(() => [] as Array<{ id: string; extensionNumber: string; name: string; status: string }>);
+  const records = await fetchDetailedCallLog(dateFrom, dateTo, token, baseUrl);
 
-  const extMap = new Map<string, { name: string; extensionNumber: string }>();
+  const extMap = new Map<string, { name: string; extensionNumber: string; status: string }>();
   for (const e of extensions) {
-    extMap.set(String(e.id), { name: e.name, extensionNumber: e.extensionNumber });
+    extMap.set(String(e.id), {
+      name: e.name,
+      extensionNumber: e.extensionNumber,
+      status: (e as { status?: string }).status || "",
+    });
   }
 
   interface Agg {
@@ -211,6 +214,11 @@ export async function getAgentCallStats(
     durations: number[];
   }
   const stats = new Map<string, Agg>();
+
+  // Seed one entry per user extension so agents with zero activity still appear.
+  for (const e of extensions) {
+    stats.set(String(e.id), { inbound: 0, outbound: 0, answered: 0, missed: 0, durations: [] });
+  }
 
   function agg(extId: string): Agg {
     let a = stats.get(extId);
@@ -246,6 +254,8 @@ export async function getAgentCallStats(
   const out: AgentCallStat[] = [];
   for (const [extId, a] of stats) {
     const meta = extMap.get(extId);
+    // Skip disabled / unassigned extensions so the list stays focused on active users.
+    if (meta && meta.status && meta.status !== "Enabled") continue;
     const avgSec =
       a.durations.length > 0
         ? Math.round(a.durations.reduce((s, d) => s + d, 0) / a.durations.length)
@@ -265,8 +275,12 @@ export async function getAgentCallStats(
     });
   }
 
-  // Sort by most active first
-  out.sort((x, y) => y.inbound + y.outbound - (x.inbound + x.outbound));
+  // Sort by most active first, zero-activity users go last alphabetically
+  out.sort((x, y) => {
+    const total = (y.inbound + y.outbound) - (x.inbound + x.outbound);
+    if (total !== 0) return total;
+    return x.name.localeCompare(y.name);
+  });
   return out;
 }
 
