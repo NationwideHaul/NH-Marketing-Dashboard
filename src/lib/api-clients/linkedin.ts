@@ -1,9 +1,11 @@
 // LinkedIn API client for organic + company page analytics
 
+import { getCredential } from "@/lib/credential-store";
+
 const LI_BASE_URL = "https://api.linkedin.com/v2";
 
-function getHeaders() {
-  const token = process.env.LINKEDIN_ACCESS_TOKEN;
+async function getHeaders() {
+  const { value: token } = await getCredential("LINKEDIN_ACCESS_TOKEN");
   if (!token) throw new Error("LINKEDIN_ACCESS_TOKEN not configured");
   return {
     Authorization: `Bearer ${token}`,
@@ -16,7 +18,7 @@ function getHeaders() {
 export async function getOrganization(organizationId: string) {
   const response = await fetch(
     `${LI_BASE_URL}/organizations/${organizationId}`,
-    { headers: getHeaders() }
+    { headers: await getHeaders() }
   );
 
   if (!response.ok) {
@@ -30,7 +32,7 @@ export async function getOrganization(organizationId: string) {
 export async function getFollowerStats(organizationId: string) {
   const response = await fetch(
     `${LI_BASE_URL}/organizationalEntityFollowerStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:${organizationId}`,
-    { headers: getHeaders() }
+    { headers: await getHeaders() }
   );
 
   if (!response.ok) {
@@ -48,7 +50,7 @@ export async function getPageStats(
 ) {
   const response = await fetch(
     `${LI_BASE_URL}/organizationPageStatistics?q=organization&organization=urn:li:organization:${organizationId}&timeIntervals.timeGranularityType=DAY&timeIntervals.timeRange.start=${startDate}&timeIntervals.timeRange.end=${endDate}`,
-    { headers: getHeaders() }
+    { headers: await getHeaders() }
   );
 
   if (!response.ok) {
@@ -66,7 +68,7 @@ export async function getShareStats(
 ) {
   const response = await fetch(
     `${LI_BASE_URL}/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=urn:li:organization:${organizationId}&timeIntervals.timeGranularityType=DAY&timeIntervals.timeRange.start=${startDate}&timeIntervals.timeRange.end=${endDate}`,
-    { headers: getHeaders() }
+    { headers: await getHeaders() }
   );
 
   if (!response.ok) {

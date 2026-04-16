@@ -1,9 +1,11 @@
 // CallRail API client for call tracking
 
+import { getCredential } from "@/lib/credential-store";
+
 const CR_BASE_URL = "https://api.callrail.com/v3";
 
-function getHeaders() {
-  const apiKey = process.env.CALLRAIL_API_KEY;
+async function getHeaders() {
+  const { value: apiKey } = await getCredential("CALLRAIL_API_KEY");
   if (!apiKey) throw new Error("CALLRAIL_API_KEY not configured");
   return {
     Authorization: `Token token=${apiKey}`,
@@ -14,7 +16,7 @@ function getHeaders() {
 // List accounts
 export async function listAccounts() {
   const response = await fetch(`${CR_BASE_URL}/a.json`, {
-    headers: getHeaders(),
+    headers: await getHeaders(),
   });
   if (!response.ok) throw new Error(`CallRail API error: ${response.status}`);
   return response.json();
@@ -24,7 +26,7 @@ export async function listAccounts() {
 export async function listCompanies(accountId: string) {
   const response = await fetch(
     `${CR_BASE_URL}/a/${accountId}/companies.json`,
-    { headers: getHeaders() }
+    { headers: await getHeaders() }
   );
   if (!response.ok) throw new Error(`CallRail API error: ${response.status}`);
   return response.json();
@@ -55,7 +57,7 @@ export async function getCalls(
 
     const response = await fetch(
       `${CR_BASE_URL}/a/${accountId}/calls.json?${params}`,
-      { headers: getHeaders() }
+      { headers: await getHeaders() }
     );
     if (!response.ok) throw new Error(`CallRail API error: ${response.status}`);
 
@@ -143,7 +145,7 @@ export async function getTrackingNumbers(accountId: string, companyId?: string) 
   const params = companyId ? `?company_id=${companyId}` : "";
   const response = await fetch(
     `${CR_BASE_URL}/a/${accountId}/trackers.json${params}`,
-    { headers: getHeaders() }
+    { headers: await getHeaders() }
   );
   if (!response.ok) throw new Error(`CallRail API error: ${response.status}`);
   return response.json();

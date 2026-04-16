@@ -1,6 +1,6 @@
 // RingCentral API client for call tracking
 
-const RC_BASE_URL = process.env.RINGCENTRAL_SERVER_URL || "https://platform.ringcentral.com";
+import { getCredential } from "@/lib/credential-store";
 
 interface RCAuthResponse {
   access_token: string;
@@ -8,17 +8,28 @@ interface RCAuthResponse {
   expires_in: number;
 }
 
+async function getBaseUrl(): Promise<string> {
+  const { value } = await getCredential("RINGCENTRAL_SERVER_URL");
+  return value || "https://platform.ringcentral.com";
+}
+
 // Authenticate using JWT (service account)
-async function getAccessToken(): Promise<string> {
-  const clientId = process.env.RINGCENTRAL_CLIENT_ID;
-  const clientSecret = process.env.RINGCENTRAL_CLIENT_SECRET;
-  const jwtToken = process.env.RINGCENTRAL_JWT_TOKEN;
+async function getAccessToken(): Promise<{ token: string; baseUrl: string }> {
+  const [clientIdR, clientSecretR, jwtTokenR, baseUrl] = await Promise.all([
+    getCredential("RINGCENTRAL_CLIENT_ID"),
+    getCredential("RINGCENTRAL_CLIENT_SECRET"),
+    getCredential("RINGCENTRAL_JWT_TOKEN"),
+    getBaseUrl(),
+  ]);
+  const clientId = clientIdR.value;
+  const clientSecret = clientSecretR.value;
+  const jwtToken = jwtTokenR.value;
 
   if (!clientId || !clientSecret || !jwtToken) {
     throw new Error("RingCentral credentials not configured");
   }
 
-  const response = await fetch(`${RC_BASE_URL}/restapi/oauth/token`, {
+  const response = await fetch(`${baseUrl}/restapi/oauth/token`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -35,7 +46,7 @@ async function getAccessToken(): Promise<string> {
   }
 
   const data: RCAuthResponse = await response.json();
-  return data.access_token;
+  return { token: data.access_token, baseUrl };
 }
 
 // Get call log
@@ -44,7 +55,7 @@ export async function getCallLog(
   dateTo: string,
   perPage: number = 100
 ) {
-  const token = await getAccessToken();
+  const { token, baseUrl } = await getAccessToken();
 
   const params = new URLSearchParams({
     dateFrom,
@@ -54,7 +65,7 @@ export async function getCallLog(
   });
 
   const response = await fetch(
-    `${RC_BASE_URL}/restapi/v1.0/account/~/call-log?${params}`,
+    `${baseUrl}/restapi/v1.0/account/~/call-log?${params}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
 
@@ -70,10 +81,10 @@ export async function getCallAnalytics(
   dateFrom: string,
   dateTo: string
 ) {
-  const token = await getAccessToken();
+  const { token, baseUrl } = await getAccessToken();
 
   const response = await fetch(
-    `${RC_BASE_URL}/restapi/v1.0/account/~/call-log?dateFrom=${dateFrom}&dateTo=${dateTo}&view=Simple&perPage=250`,
+    `${baseUrl}/restapi/v1.0/account/~/call-log?dateFrom=${dateFrom}&dateTo=${dateTo}&view=Simple&perPage=250`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
 

@@ -1,6 +1,8 @@
 // Nationwide Haul CRM API client
 // Calls the internal CRM marketing summary endpoint at crm-nh.vercel.app
 
+import { getCredential } from "@/lib/credential-store";
+
 const CRM_BASE_URL = "https://crm-nh.vercel.app/api/marketing";
 
 export interface CRMSummaryResponse {
@@ -33,8 +35,8 @@ export interface CRMSummaryResponse {
   };
 }
 
-function getHeaders() {
-  const apiKey = process.env.NH_CRM_API_KEY;
+async function getHeaders() {
+  const { value: apiKey } = await getCredential("NH_CRM_API_KEY");
   if (!apiKey) throw new Error("NH_CRM_API_KEY not configured");
   return {
     Authorization: `Bearer ${apiKey}`,
@@ -49,7 +51,7 @@ export async function getCRMSummary(
 ): Promise<CRMSummaryResponse> {
   const params = new URLSearchParams({ startDate, endDate });
   const response = await fetch(`${CRM_BASE_URL}/summary?${params}`, {
-    headers: getHeaders(),
+    headers: await getHeaders(),
   });
   if (!response.ok) throw new Error(`NH CRM API error: ${response.status}`);
   return response.json();
