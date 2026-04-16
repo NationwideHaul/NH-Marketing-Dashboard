@@ -12,6 +12,11 @@
 import { Redis } from "@upstash/redis";
 
 const KEY_PREFIX = "cred:";
+const ACCOUNT_KEY_PREFIX = "cred:account:";
+
+function accountKey(accountId: string, field: string) {
+  return `${ACCOUNT_KEY_PREFIX}${accountId}:${field}`;
+}
 
 let cachedClient: Redis | null = null;
 let kvChecked = false;
@@ -166,4 +171,81 @@ export async function deleteCredentials(envVarNames: string[]): Promise<void> {
  */
 export function getEnvSync(envVarName: string): string {
   return trim(process.env[envVarName]);
+}
+
+// ========== Per-account credentials ==========
+// Keyed as cred:account:<accountId>:<field>, e.g.
+//   cred:account:nationwide-haul:ga4PropertyId
+//   cred:account:nfi-truck-sales:ghlApiKey
+
+/**
+ * Resolve a per-account credential. Priority:
+ *   1. KV override (cred:account:<accountId>:<field>)
+ *   2. fallbackEnvVar if provided (and its value is set)
+ *   3. fallbackValue (typically hardcoded from accounts.ts config)
+ */
+export async function getAccountCredential(
+  accountId: string,
+  field: string,
+  opts: { fallbackEnvVar?: string; fallbackValue?: string } = {}
+): Promise<ResolvedCredential> {
+  const client = detectKv();
+  if (client) {
+    try {
+      const v = await client.get<string>(accountKey(accountId, field));
+      if (v && typeof v === "string" && v.trim()) {
+        return { value: v.trim(), source: "kv" };
+      }
+    } catch (err) {
+      console.warn(
+        `[credential-store] KV read failed for ${accountId}/${field}:`,
+        (err as Error).message
+      );
+    }
+  }
+
+  if (opts.fallbackEnvVar) {
+    const envValue = trim(process.env[opts.fallbackEnvVar]);
+    if (envValue) return { value: envValue, source: "env" };
+  }
+
+  if (opts.fallbackValue && opts.fallbackValue.trim()) {
+    return { value: opts.fallbackValue.trim(), source: "env" };
+  }
+
+  return { value: "", source: "missing" };
+}
+
+export async function setAccountCredential(
+  accountId: string,
+  field: string,
+  value: string
+): Promise<void> {
+  const client = detectKv();
+  if (!client) throw new KvNotConfiguredError();
+  const trimmed = value.trim();
+  if (!trimmed) {
+    await client.del(accountKey(accountId, field));
+    return;
+  }
+  await client.set(accountKey(accountId, field), trimmed);
+}
+
+export async function deleteAccountCredential(
+  accountId: string,
+  field: string
+): Promise<void> {
+  const client = detectKv();
+  if (!client) throw new KvNotConfiguredError();
+  await client.del(accountKey(accountId, field));
+}
+
+export async function deleteAccountCredentials(
+  accountId: string,
+  fields: string[]
+): Promise<void> {
+  const client = detectKv();
+  if (!client) throw new KvNotConfiguredError();
+  if (fields.length === 0) return;
+  await client.del(...fields.map((f) => accountKey(accountId, f)));
 }

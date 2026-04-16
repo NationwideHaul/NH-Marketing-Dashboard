@@ -147,10 +147,131 @@ export function getConnection(id: string): ConnectionDef | undefined {
   return connections.find((c) => c.id === id);
 }
 
+// ========== Per-account connection definitions ==========
+// These vary across sub-accounts (NH, NFI, NHTTR+RV, NHTTR+TTR, RRI). Each
+// field is resolved against:
+//   1. KV override at cred:account:<accountId>:<field>
+//   2. fallbackEnvVar (for GHL per-account API keys that live in separate env vars)
+//   3. Hardcoded value from accounts.ts / account-credentials.ts
+//
+// The UI treats the selected sidebar account as the scope.
+
+export interface PerAccountField {
+  /** The unique field id used as the KV suffix, e.g. "ga4PropertyId". */
+  field: string;
+  label: string;
+  secret: boolean;
+  /** Reads fallback value from a per-account env var pattern (e.g. GHL_API_KEY_{ACCOUNT}). */
+  fallbackEnvVar?: (accountId: string) => string | undefined;
+}
+
+export interface PerAccountConnectionDef {
+  id: string;
+  name: string;
+  description: string;
+  category: ConnectionCategory;
+  icon: string;
+  docsUrl?: string;
+  fields: PerAccountField[];
+}
+
+/** Maps dashboard account IDs to the env-var suffix used for GHL keys. */
+const GHL_KEY_SUFFIX: Record<string, string> = {
+  "nationwide-haul": "NATIONWIDE_HAUL",
+  "nfi-truck-sales": "NFI",
+  "road-ready": "ROAD_READY",
+};
+
+export const perAccountConnections: PerAccountConnectionDef[] = [
+  {
+    id: "ga4",
+    name: "Google Analytics 4",
+    description: "GA4 property for this account's website tracking.",
+    category: "analytics",
+    icon: "BarChart3",
+    fields: [
+      { field: "ga4PropertyId", label: "Property ID", secret: false },
+    ],
+  },
+  {
+    id: "google-ads-customer",
+    name: "Google Ads Customer",
+    description: "Customer (account) ID within the Google Ads manager.",
+    category: "ads",
+    icon: "DollarSign",
+    fields: [
+      { field: "googleAdsCustomerId", label: "Customer ID", secret: false },
+    ],
+  },
+  {
+    id: "callrail-company",
+    name: "CallRail Company",
+    description: "Company ID + display name within your CallRail account.",
+    category: "calls",
+    icon: "Phone",
+    fields: [
+      { field: "callrailCompanyId", label: "Company ID", secret: false },
+      { field: "callrailCompanyName", label: "Company Name", secret: false },
+    ],
+  },
+  {
+    id: "meta-per-account",
+    name: "Meta Ad Account",
+    description: "Facebook/Instagram Ad Account, Page, and IG User for this business.",
+    category: "ads",
+    icon: "Megaphone",
+    fields: [
+      { field: "metaAdAccountId", label: "Ad Account ID", secret: false },
+      { field: "metaPageId", label: "Facebook Page ID", secret: false },
+      { field: "metaIgUserId", label: "Instagram User ID", secret: false },
+    ],
+  },
+  {
+    id: "ghl-location",
+    name: "Go High Level Location",
+    description: "Location ID + per-account API key (if different from the global one).",
+    category: "crm",
+    icon: "Mail",
+    fields: [
+      { field: "ghlLocationId", label: "Location ID", secret: false },
+      {
+        field: "ghlApiKey",
+        label: "API Key",
+        secret: true,
+        fallbackEnvVar: (accountId) => {
+          const suffix = GHL_KEY_SUFFIX[accountId];
+          return suffix ? `GHL_API_KEY_${suffix}` : undefined;
+        },
+      },
+    ],
+  },
+  {
+    id: "youtube-channel",
+    name: "YouTube Channel",
+    description: "Channel ID for this account (uses global YouTube refresh token).",
+    category: "social",
+    icon: "Video",
+    fields: [
+      { field: "youtubeChannelId", label: "Channel ID", secret: false },
+    ],
+  },
+];
+
+export function getPerAccountConnection(id: string): PerAccountConnectionDef | undefined {
+  return perAccountConnections.find((c) => c.id === id);
+}
+
 // ---- Server-only helpers -----------------------------------------------
 // Reads credentials from the store (KV with env fallback).
 
-import { getCredential, getCredentialFromList, isKvEnabled } from "./credential-store";
+import { getAccount } from "./accounts";
+import { getAccountCredentials } from "./account-credentials";
+import {
+  getAccountCredential,
+  getCredential,
+  getCredentialFromList,
+  isKvEnabled,
+} from "./credential-store";
 
 export interface CredentialStatus {
   envVar: string;
@@ -234,3 +355,99 @@ export async function getConnectionStatuses(): Promise<ConnectionStatus[]> {
 }
 
 export { isKvEnabled };
+
+// ---- Per-account status resolution -------------------------------------
+
+export interface PerAccountFieldStatus {
+  field: string;
+  label: string;
+  secret: boolean;
+  configured: boolean;
+  preview: string;
+  source: "kv" | "env" | "missing";
+  fallbackEnvVar?: string;
+}
+
+export interface PerAccountConnectionStatus {
+  id: string;
+  name: string;
+  description: string;
+  category: ConnectionCategory;
+  icon: string;
+  docsUrl?: string;
+  connected: boolean;
+  fields: PerAccountFieldStatus[];
+}
+
+/**
+ * Pull the hardcoded value for a given field from the account's static config
+ * (accounts.ts). Returns empty string when not defined for that account.
+ */
+function accountConfigValue(accountId: string, field: string): string {
+  // Strip the -rv / -ttr suffix if present — those sub-service flavors reuse
+  // the parent account's static config for most fields, except the ones the
+  // sub-service explicitly overrides.
+  const parentId = accountId.replace(/-(rv|ttr)$/, "");
+  const subServiceId = accountId !== parentId ? accountId.slice(parentId.length + 1) : null;
+
+  const account = getAccount(parentId);
+  if (!account) return "";
+
+  // Sub-service override: check accounts.ts subServices entry
+  if (subServiceId && account.subServices) {
+    const sub = account.subServices.find((s) => s.id === subServiceId);
+    if (sub && field in sub) {
+      const val = (sub as unknown as Record<string, unknown>)[field];
+      if (typeof val === "string") return val;
+    }
+  }
+
+  const config = account.config as unknown as Record<string, unknown>;
+  const v = config?.[field];
+  if (typeof v === "string" && v) return v;
+
+  // Secondary fallback: account-credentials.ts has richer static config
+  // (callrail company IDs, IG user IDs when env-var isn't set, etc.).
+  const creds = getAccountCredentials(accountId) as unknown as Record<string, unknown>;
+  const credVal = creds?.[field];
+  return typeof credVal === "string" ? credVal : "";
+}
+
+export async function getPerAccountConnectionStatuses(
+  accountId: string
+): Promise<PerAccountConnectionStatus[]> {
+  return Promise.all(
+    perAccountConnections.map(async (conn) => {
+      const fieldStatuses: PerAccountFieldStatus[] = await Promise.all(
+        conn.fields.map(async (f) => {
+          const fallbackEnvVar = f.fallbackEnvVar?.(accountId);
+          const fallbackValue = accountConfigValue(accountId, f.field);
+          const resolved = await getAccountCredential(accountId, f.field, {
+            fallbackEnvVar,
+            fallbackValue,
+          });
+          return {
+            field: f.field,
+            label: f.label,
+            secret: f.secret,
+            configured: Boolean(resolved.value),
+            preview: preview(resolved.value, f.secret),
+            source: resolved.source,
+            fallbackEnvVar,
+          };
+        })
+      );
+      const connected = fieldStatuses.every((s) => s.configured);
+      return {
+        id: conn.id,
+        name: conn.name,
+        description: conn.description,
+        category: conn.category,
+        icon: conn.icon,
+        docsUrl: conn.docsUrl,
+        connected,
+        fields: fieldStatuses,
+      };
+    })
+  );
+}
