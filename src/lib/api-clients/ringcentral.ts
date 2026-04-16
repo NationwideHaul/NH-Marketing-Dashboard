@@ -229,26 +229,71 @@ export async function getAgentCallStats(
     return a;
   }
 
+  // userExtIds lets us distinguish user extensions from queue/IVR extensions
+  // when scanning call legs (queue legs also have an extensionId).
+  const userExtIds = new Set(extensions.map((e) => String(e.id)));
+
+  /**
+   * Find the user extension that handled this inbound call. We prefer
+   * call legs because inbound calls often go Queue → Agent and the top-level
+   * `to.extensionId` is the queue, not the human who answered.
+   */
+  function findInboundAgentExt(rec: Record<string, unknown>): { extId: string; answered: boolean } {
+    const legs = Array.isArray(rec.legs) ? (rec.legs as Array<Record<string, unknown>>) : [];
+    // 1. Look for a leg that was Accepted/Call connected and lands on a user extension.
+    for (const leg of legs) {
+      const legResult = String(leg.result || "");
+      if (legResult !== "Accepted" && legResult !== "Call connected") continue;
+      const to = (leg.to as Record<string, unknown>) || {};
+      const id = typeof to.extensionId !== "undefined" ? String(to.extensionId) : "";
+      if (id && userExtIds.has(id)) return { extId: id, answered: true };
+    }
+    // 2. No answered leg — pick the most-recent leg that rang a user extension
+    //    (counts as a missed call for that user).
+    for (let i = legs.length - 1; i >= 0; i--) {
+      const leg = legs[i];
+      const to = (leg.to as Record<string, unknown>) || {};
+      const id = typeof to.extensionId !== "undefined" ? String(to.extensionId) : "";
+      if (id && userExtIds.has(id)) return { extId: id, answered: false };
+    }
+    // 3. Fall back to the top-level `to` in case there are no legs (older API shapes).
+    const top = (rec.to as Record<string, unknown>) || {};
+    const topId = typeof top.extensionId !== "undefined" ? String(top.extensionId) : "";
+    if (topId && userExtIds.has(topId)) {
+      const topResult = String(rec.result || "");
+      const topAns = topResult === "Accepted" || topResult === "Call connected";
+      return { extId: topId, answered: topAns };
+    }
+    return { extId: "", answered: false };
+  }
+
   for (const rec of records) {
     const direction = String(rec.direction || "");
     const result = String(rec.result || "");
     const duration = typeof rec.duration === "number" ? rec.duration : 0;
-    const answered =
-      result === "Accepted" ||
-      result === "Call connected" ||
-      (duration > 0 && result !== "Missed" && result !== "No Answer");
 
-    // Identify the agent's extension based on direction.
-    const leg = direction === "Inbound" ? (rec.to as Record<string, unknown>) : (rec.from as Record<string, unknown>);
-    const extId = leg && typeof leg.extensionId !== "undefined" ? String(leg.extensionId) : "";
-    if (!extId) continue; // Skip calls not tied to a user extension (e.g. IVR-only)
-
-    const a = agg(extId);
-    if (direction === "Inbound") a.inbound++;
-    else if (direction === "Outbound") a.outbound++;
-    if (answered) a.answered++;
-    if (result === "Missed" || result === "No Answer") a.missed++;
-    if (duration > 0) a.durations.push(duration);
+    if (direction === "Inbound") {
+      const { extId, answered } = findInboundAgentExt(rec);
+      if (!extId) continue; // IVR-only or untracked — leave in aggregate totals only
+      const a = agg(extId);
+      a.inbound++;
+      if (answered) {
+        a.answered++;
+        if (duration > 0) a.durations.push(duration);
+      } else {
+        a.missed++;
+      }
+    } else if (direction === "Outbound") {
+      const from = (rec.from as Record<string, unknown>) || {};
+      const extId = typeof from.extensionId !== "undefined" ? String(from.extensionId) : "";
+      if (!extId || !userExtIds.has(extId)) continue;
+      const a = agg(extId);
+      a.outbound++;
+      const answered = result === "Accepted" || result === "Call connected" || (duration > 0 && result !== "Missed" && result !== "No Answer");
+      if (answered) a.answered++;
+      if (result === "Missed" || result === "No Answer") a.missed++;
+      if (duration > 0) a.durations.push(duration);
+    }
   }
 
   const out: AgentCallStat[] = [];

@@ -83,18 +83,44 @@ function AgentCallsTab() {
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
   const [directionFilter, setDirectionFilter] = useState<"all" | "inbound" | "outbound">("all");
 
-  // Sync selected agents whenever the agent list changes (new date range / account switch)
+  // Persist per-account selection in localStorage. Default (no saved entry) =
+  // all agents selected. Saved entry = exactly what the user picked last time
+  // for this sub-account.
+  const storageKey = `nh-agent-selection-${apiAccountId}`;
+
+  // When agents or account change: restore saved selection intersected with
+  // the current agent list so stale extension IDs are dropped cleanly.
   useEffect(() => {
+    if (agents.length === 0) return;
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      try {
+        const ids = JSON.parse(saved) as string[];
+        const validIds = ids.filter((id) => agents.some((a) => a.id === id));
+        if (validIds.length > 0) {
+          setSelectedAgents(validIds);
+          return;
+        }
+      } catch {
+        // fall through to default
+      }
+    }
     setSelectedAgents(agents.map((a) => a.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agents.length, apiAccountId, startDate, endDate]);
+  }, [agents.length, apiAccountId]);
 
   const filteredAgents = agents.filter((a) => selectedAgents.includes(a.id));
 
+  function persistSelection(ids: string[]) {
+    localStorage.setItem(storageKey, JSON.stringify(ids));
+  }
+
   const toggleAgent = (id: string) => {
-    setSelectedAgents((prev) =>
-      prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
-    );
+    setSelectedAgents((prev) => {
+      const next = prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id];
+      persistSelection(next);
+      return next;
+    });
   };
 
   const totalInbound = filteredAgents.reduce((s, a) => s + a.inbound, 0);
@@ -127,7 +153,11 @@ function AgentCallsTab() {
             <div className="absolute z-20 top-full left-0 mt-1 w-72 rounded-xl border border-border bg-card shadow-lg overflow-hidden">
               <div className="p-2 border-b border-border">
                 <button
-                  onClick={() => setSelectedAgents(selectedAgents.length === agents.length ? [] : agents.map((a) => a.id))}
+                  onClick={() => {
+                    const next = selectedAgents.length === agents.length ? [] : agents.map((a) => a.id);
+                    setSelectedAgents(next);
+                    persistSelection(next);
+                  }}
                   className="text-xs text-primary font-medium hover:underline"
                 >
                   {selectedAgents.length === agents.length ? "Deselect all" : "Select all"}
