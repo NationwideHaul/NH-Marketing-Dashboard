@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGoogleAdsData, getStoredGoogleClient } from "@/lib/api-clients/google";
 import { getAccountCredentials } from "@/lib/account-credentials";
+import { getCredential } from "@/lib/credential-store";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -21,8 +22,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const { accessToken } = await getStoredGoogleClient();
+    const { value: refreshToken } = await getCredential("GOOGLE_REFRESH_TOKEN");
 
-    const data = await getGoogleAdsData(accessToken, process.env.GOOGLE_REFRESH_TOKEN, customerId, startDate, endDate);
+    const data = await getGoogleAdsData(accessToken, refreshToken || undefined, customerId, startDate, endDate);
     return NextResponse.json({ platform: "google-ads", status: "live", accountId, data });
   } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
     return NextResponse.json({

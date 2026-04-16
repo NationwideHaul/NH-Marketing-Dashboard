@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGA4Data, getStoredGoogleClient } from "@/lib/api-clients/google";
 import { getAccountCredentials } from "@/lib/account-credentials";
+import { getCredential } from "@/lib/credential-store";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -11,8 +12,9 @@ export async function GET(request: NextRequest) {
 
   const creds = await getAccountCredentials(accountId);
   const propertyId = creds.ga4PropertyId;
+  const { value: clientId } = await getCredential("GOOGLE_CLIENT_ID");
 
-  if (!propertyId || !process.env.GOOGLE_CLIENT_ID) {
+  if (!propertyId || !clientId) {
     return NextResponse.json({
       platform: "google-analytics",
       status: "error",
@@ -22,10 +24,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const { accessToken } = await getStoredGoogleClient();
+    const { value: refreshToken } = await getCredential("GOOGLE_REFRESH_TOKEN");
 
     const data = await getGA4Data(
       accessToken,
-      process.env.GOOGLE_REFRESH_TOKEN,
+      refreshToken || undefined,
       propertyId,
       startDate,
       endDate,

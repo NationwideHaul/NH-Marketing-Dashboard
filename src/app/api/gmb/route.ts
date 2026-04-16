@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGMBData, getStoredGoogleClient } from "@/lib/api-clients/google";
 import { getAccountCredentials } from "@/lib/account-credentials";
+import { getCredential } from "@/lib/credential-store";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -12,7 +13,17 @@ export async function GET(request: NextRequest) {
   const creds = await getAccountCredentials(accountId);
 
   let locationId = locationIdParam;
-  const accountIdForGmb = process.env.GMB_ACCOUNT_ID;
+  const [
+    { value: accountIdForGmb },
+    { value: gmbLocEnv },
+    { value: clientId },
+    { value: refreshToken },
+  ] = await Promise.all([
+    getCredential("GMB_ACCOUNT_ID"),
+    getCredential("GMB_LOCATION_ID"),
+    getCredential("GOOGLE_CLIENT_ID"),
+    getCredential("GOOGLE_REFRESH_TOKEN"),
+  ]);
 
   if (creds.gmbLocations?.length) {
     if (locationIdParam) {
@@ -23,9 +34,9 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  if (!locationId) locationId = process.env.GMB_LOCATION_ID || null;
+  if (!locationId) locationId = gmbLocEnv || null;
 
-  if (!locationId || !process.env.GOOGLE_CLIENT_ID) {
+  if (!locationId || !clientId) {
     if (creds.gmbLocations?.length) {
       return NextResponse.json({
         platform: "gmb", status: "locations-only", accountId,
@@ -38,7 +49,7 @@ export async function GET(request: NextRequest) {
   try {
     const { accessToken } = await getStoredGoogleClient();
 
-    const data = await getGMBData(accessToken, process.env.GOOGLE_REFRESH_TOKEN, accountIdForGmb || "", locationId, startDate, endDate);
+    const data = await getGMBData(accessToken, refreshToken || undefined, accountIdForGmb || "", locationId, startDate, endDate);
 
     return NextResponse.json({
       platform: "gmb", status: "live", accountId, locationId,

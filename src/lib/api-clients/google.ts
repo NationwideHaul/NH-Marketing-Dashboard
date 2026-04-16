@@ -1,12 +1,18 @@
 import { google } from "googleapis";
 import { BetaAnalyticsDataClient } from "@google-analytics/data";
+import { getCredential } from "@/lib/credential-store";
 
-// Create OAuth2 client from env
-function getOAuth2Client() {
+// Create OAuth2 client — reads client_id/secret via KV-first / env-fallback.
+async function getOAuth2Client() {
+  const [clientId, clientSecret] = await Promise.all([
+    getCredential("GOOGLE_CLIENT_ID").then((r) => r.value),
+    getCredential("GOOGLE_CLIENT_SECRET").then((r) => r.value),
+  ]);
+  const nextauthUrl = (process.env.NEXTAUTH_URL || "").trim();
   const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    `${process.env.NEXTAUTH_URL}/api/auth/callback/google`
+    clientId,
+    clientSecret,
+    `${nextauthUrl}/api/auth/callback/google`
   );
   return oauth2Client;
 }
@@ -20,12 +26,17 @@ async function refreshAccessToken(refreshToken: string) {
   const now = Date.now() / 1000;
   if (cached && cached.expiry > now + 60) return cached.accessToken;
 
+  const [clientId, clientSecret] = await Promise.all([
+    getCredential("GOOGLE_CLIENT_ID").then((r) => r.value),
+    getCredential("GOOGLE_CLIENT_SECRET").then((r) => r.value),
+  ]);
+
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: (process.env.GOOGLE_CLIENT_ID || "").trim(),
-      client_secret: (process.env.GOOGLE_CLIENT_SECRET || "").trim(),
+      client_id: clientId,
+      client_secret: clientSecret,
       grant_type: "refresh_token",
       refresh_token: refreshToken,
     }),
@@ -45,12 +56,12 @@ async function refreshAccessToken(refreshToken: string) {
 
 // Default Google client — used for GA, Google Ads, GMB, etc. (main account)
 export async function getStoredGoogleClient() {
-  const refreshToken = (process.env.GOOGLE_REFRESH_TOKEN || "").trim();
+  const { value: refreshToken } = await getCredential("GOOGLE_REFRESH_TOKEN");
   if (!refreshToken) {
     throw new Error("GOOGLE_REFRESH_TOKEN not set. Connect Google once to get it.");
   }
   const accessToken = await refreshAccessToken(refreshToken);
-  const client = getOAuth2Client();
+  const client = await getOAuth2Client();
   client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
   return { client, accessToken };
 }
@@ -58,20 +69,23 @@ export async function getStoredGoogleClient() {
 // YouTube-specific client — uses YOUTUBE_REFRESH_TOKEN if set (owned by the
 // channel-owner Google account), otherwise falls back to the main token.
 export async function getStoredYouTubeClient() {
-  const refreshToken =
-    (process.env.YOUTUBE_REFRESH_TOKEN || process.env.GOOGLE_REFRESH_TOKEN || "").trim();
+  const [ytToken, mainToken] = await Promise.all([
+    getCredential("YOUTUBE_REFRESH_TOKEN").then((r) => r.value),
+    getCredential("GOOGLE_REFRESH_TOKEN").then((r) => r.value),
+  ]);
+  const refreshToken = ytToken || mainToken;
   if (!refreshToken) {
     throw new Error("No refresh token configured for YouTube.");
   }
   const accessToken = await refreshAccessToken(refreshToken);
-  const client = getOAuth2Client();
+  const client = await getOAuth2Client();
   client.setCredentials({ access_token: accessToken, refresh_token: refreshToken });
   return { client, accessToken };
 }
 
 // Set credentials from session token (legacy - kept for backwards compatibility)
-export function getAuthenticatedClient(accessToken: string, refreshToken?: string) {
-  const client = getOAuth2Client();
+export async function getAuthenticatedClient(accessToken: string, refreshToken?: string) {
+  const client = await getOAuth2Client();
   client.setCredentials({
     access_token: accessToken,
     refresh_token: refreshToken,
@@ -88,7 +102,7 @@ export async function getGA4Data(
   endDate: string,
   dimension?: string // optional: "deviceCategory", "sessionDefaultChannelGroup", "sessionSource", etc.
 ) {
-  const auth = getAuthenticatedClient(accessToken, refreshToken);
+  const auth = await getAuthenticatedClient(accessToken, refreshToken);
 
   const analyticsData = new BetaAnalyticsDataClient({
     authClient: auth as any, // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -128,7 +142,7 @@ export async function getGoogleAdsData(
   startDate: string,
   endDate: string
 ) {
-  const auth = getAuthenticatedClient(accessToken, refreshToken);
+  const auth = await getAuthenticatedClient(accessToken, refreshToken);
 
   // Google Ads API uses REST
   const url = `https://googleads.googleapis.com/v23/customers/${customerId}/googleAds:searchStream`;
@@ -147,14 +161,18 @@ export async function getGoogleAdsData(
     ORDER BY segments.date ASC
   `;
 
+  const [devToken, managerId] = await Promise.all([
+    getCredential("GOOGLE_ADS_DEVELOPER_TOKEN").then((r) => r.value),
+    getCredential("GOOGLE_ADS_MANAGER_ID").then((r) => r.value),
+  ]);
+
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
-    "developer-token": process.env.GOOGLE_ADS_DEVELOPER_TOKEN || "",
+    "developer-token": devToken,
     "Content-Type": "application/json",
   };
 
   // MCC (Manager Account) ID is required when accessing sub-accounts
-  const managerId = process.env.GOOGLE_ADS_MANAGER_ID;
   if (managerId) {
     headers["login-customer-id"] = managerId;
   }
@@ -183,7 +201,7 @@ export async function getGMBData(
   startDate: string,
   endDate: string
 ) {
-  const auth = getAuthenticatedClient(accessToken, refreshToken);
+  const auth = await getAuthenticatedClient(accessToken, refreshToken);
 
   const mybusiness = google.mybusinessbusinessinformation({
     version: "v1",
@@ -267,7 +285,7 @@ export async function getYouTubeAnalytics(
   startDate: string,
   endDate: string
 ) {
-  const auth = getAuthenticatedClient(accessToken, refreshToken);
+  const auth = await getAuthenticatedClient(accessToken, refreshToken);
 
   const youtubeAnalytics = google.youtubeAnalytics({
     version: "v2",
@@ -293,7 +311,7 @@ export async function getYouTubeTopVideos(
   startDate: string,
   endDate: string
 ) {
-  const auth = getAuthenticatedClient(accessToken, refreshToken);
+  const auth = await getAuthenticatedClient(accessToken, refreshToken);
 
   const youtubeAnalytics = google.youtubeAnalytics({
     version: "v2",
@@ -320,7 +338,7 @@ export async function getYouTubeTrafficSources(
   startDate: string,
   endDate: string
 ) {
-  const auth = getAuthenticatedClient(accessToken, refreshToken);
+  const auth = await getAuthenticatedClient(accessToken, refreshToken);
 
   const youtubeAnalytics = google.youtubeAnalytics({
     version: "v2",

@@ -8,6 +8,7 @@ import {
   getStoredYouTubeClient,
 } from "@/lib/api-clients/google";
 import { getAccountCredentials } from "@/lib/account-credentials";
+import { getCredential } from "@/lib/credential-store";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -29,7 +30,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const { accessToken } = await getStoredYouTubeClient();
-    const refreshToken = process.env.YOUTUBE_REFRESH_TOKEN || process.env.GOOGLE_REFRESH_TOKEN;
+    const [ytToken, mainToken] = await Promise.all([
+      getCredential("YOUTUBE_REFRESH_TOKEN").then((r) => r.value),
+      getCredential("GOOGLE_REFRESH_TOKEN").then((r) => r.value),
+    ]);
+    const refreshToken = ytToken || mainToken;
 
     // Always get channel stats + recent videos from Data API (works for Brand Account managers)
     const [channel, allVideos] = await Promise.all([
