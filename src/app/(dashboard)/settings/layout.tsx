@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Link2, SlidersHorizontal, Target } from "lucide-react";
+import { Link2, SlidersHorizontal, Target, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const settingsTabs = [
   { id: "connections", label: "Connections", href: "/settings/connections", icon: Link2 },
+  { id: "team", label: "Team Members", href: "/settings/team", icon: Users },
   { id: "services", label: "Services & Costs", href: "/settings/services", icon: SlidersHorizontal },
   { id: "mapping", label: "Campaign Mapping", href: "/settings/mapping", icon: Target },
 ];

@@ -117,8 +117,7 @@ export async function listExtensions() {
     const data = await res.json();
     const records = (data.records || []) as Array<Record<string, unknown>>;
     all.push(...records);
-    const paging = data.paging as { totalPages?: number } | undefined;
-    if (!paging || !paging.totalPages || page >= paging.totalPages) break;
+    if (records.length < perPage) break;
     page++;
   }
 
@@ -181,8 +180,8 @@ async function fetchDetailedCallLog(
     const data = await res.json();
     const records = (data.records || []) as Array<Record<string, unknown>>;
     all.push(...records);
-    const paging = data.paging as { totalPages?: number } | undefined;
-    if (!paging || !paging.totalPages || page >= paging.totalPages) break;
+    // RingCentral doesn't return totalPages — stop on a short page.
+    if (records.length < perPage) break;
     page++;
   }
   return all;
@@ -329,31 +328,47 @@ export async function getAgentCallStats(
   return out;
 }
 
-// Get call log analytics (aggregated)
+// Get call log analytics (aggregated) — paginates to cover the entire window.
 export async function getCallAnalytics(
   dateFrom: string,
   dateTo: string
 ) {
   const { token, baseUrl } = await getAccessToken();
 
-  const response = await fetch(
-    `${baseUrl}/restapi/v1.0/account/~/call-log?dateFrom=${dateFrom}&dateTo=${dateTo}&view=Simple&perPage=250`,
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
+  const calls: Array<Record<string, unknown>> = [];
+  let page = 1;
+  const perPage = 250;
 
-  if (!response.ok) {
-    throw new Error(`RingCentral API error: ${response.status}`);
+  while (page <= 40) { // safety cap (40 * 250 = 10k calls per window)
+    const params = new URLSearchParams({
+      dateFrom,
+      dateTo,
+      view: "Simple",
+      perPage: String(perPage),
+      page: String(page),
+    });
+    const response = await fetch(
+      `${baseUrl}/restapi/v1.0/account/~/call-log?${params}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!response.ok) {
+      throw new Error(`RingCentral API error: ${response.status}`);
+    }
+    const data = await response.json();
+    const records = (data.records || []) as Array<Record<string, unknown>>;
+    calls.push(...records);
+    // RingCentral doesn't return totalPages — we stop when the page is short.
+    if (records.length < perPage) break;
+    page++;
   }
 
-  const data = await response.json();
-
-  // Aggregate the call data
-  const calls = data.records || [];
   const totalCalls = calls.length;
-  const answered = calls.filter((c: any) => c.result === "Accepted" || c.result === "Call connected").length; // eslint-disable-line @typescript-eslint/no-explicit-any
-  const missed = calls.filter((c: any) => c.result === "Missed" || c.result === "No Answer").length; // eslint-disable-line @typescript-eslint/no-explicit-any
-  const durations = calls.filter((c: any) => c.duration).map((c: any) => c.duration); // eslint-disable-line @typescript-eslint/no-explicit-any
-  const avgDuration = durations.length > 0 ? durations.reduce((a: number, b: number) => a + b, 0) / durations.length / 60 : 0;
+  const answered = calls.filter((c) => c.result === "Accepted" || c.result === "Call connected").length;
+  const missed = calls.filter((c) => c.result === "Missed" || c.result === "No Answer").length;
+  const durations = calls
+    .filter((c) => typeof c.duration === "number" && (c.duration as number) > 0)
+    .map((c) => c.duration as number);
+  const avgDuration = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length / 60 : 0;
 
   return {
     totalCalls,

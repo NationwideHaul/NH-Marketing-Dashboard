@@ -3,6 +3,9 @@ import { format, subDays } from "date-fns";
 import { getCallAnalytics, getAgentCallStats } from "@/lib/api-clients/ringcentral";
 import { listAccounts, getCallSummary, getCalls, findCompanyId, getTrackingNumbers } from "@/lib/api-clients/callrail";
 import { getAccountCredentials } from "@/lib/account-credentials";
+import { getAccountCredential } from "@/lib/credential-store";
+
+export const dynamic = "force-dynamic";
 
 // Cache company IDs
 const companyIdCache: Record<string, string> = {};
@@ -26,14 +29,39 @@ export async function GET(request: NextRequest) {
     try {
       const fromIso = new Date(startDate).toISOString();
       const toIso = new Date(endDate + "T23:59:59").toISOString();
-      const [rcData, agents] = await Promise.all([
+      const [rcData, agents, assignment] = await Promise.all([
         getCallAnalytics(fromIso, toIso),
         getAgentCallStats(fromIso, toIso).catch((e) => {
           console.error("RingCentral agents error:", e.message);
           return [];
         }),
+        getAccountCredential(dashboardAccountId, "teamMemberExtensionIds"),
       ]);
-      result.data.ringcentral = { ...rcData, agents };
+
+      // Filter agents by per-account team-member assignment. If the account has
+      // no explicit assignment yet, fall back to showing every agent.
+      let filteredAgents = agents;
+      let assignedIds: string[] | null = null;
+      if (assignment.value) {
+        try {
+          const parsed = JSON.parse(assignment.value) as unknown;
+          if (Array.isArray(parsed)) {
+            assignedIds = parsed.filter((x): x is string => typeof x === "string");
+          }
+        } catch {
+          assignedIds = null;
+        }
+      }
+      if (assignedIds) {
+        const allowed = new Set(assignedIds);
+        filteredAgents = agents.filter((a) => allowed.has(a.extensionId));
+      }
+
+      result.data.ringcentral = {
+        ...rcData,
+        agents: filteredAgents,
+        teamAssignment: assignedIds ? { assigned: true, count: assignedIds.length } : { assigned: false, count: null },
+      };
     } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
       result.data.ringcentral = { error: error.message };
     }
