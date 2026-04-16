@@ -6,16 +6,20 @@ const META_API_VERSION = "v21.0";
 const META_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 
 // Helper: get Page Access Token via /me/accounts (most reliable method)
-async function getPageAccessToken(pageId: string, systemToken: string): Promise<string> {
+async function getPageAccessToken(pageId: string, systemToken: string): Promise<{ token: string; source: string; pagesFound: number }> {
   try {
     const url = `${META_BASE_URL}/me/accounts?access_token=${systemToken}`;
     const res = await fetch(url);
-    if (!res.ok) return systemToken;
+    if (!res.ok) return { token: systemToken, source: `fallback-http-${res.status}`, pagesFound: 0 };
     const data = await res.json();
-    const page = data.data?.find((p: any) => p.id === pageId); // eslint-disable-line @typescript-eslint/no-explicit-any
-    return page?.access_token || systemToken;
-  } catch {
-    return systemToken;
+    const pages = data.data || [];
+    const page = pages.find((p: any) => p.id === pageId); // eslint-disable-line @typescript-eslint/no-explicit-any
+    if (page?.access_token) {
+      return { token: page.access_token, source: "page-token", pagesFound: pages.length };
+    }
+    return { token: systemToken, source: `fallback-no-match (pages: ${pages.map((p: any) => p.id).join(",")})`, pagesFound: pages.length }; // eslint-disable-line @typescript-eslint/no-explicit-any
+  } catch (e: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+    return { token: systemToken, source: `fallback-error: ${e.message}`, pagesFound: 0 };
   }
 }
 
@@ -27,15 +31,35 @@ async function getFacebookData(pageId: string, pageToken: string, since: string,
   const pageData = pageRes.ok ? await pageRes.json() : {};
 
   // 2. Page Insights — daily reach, engagement, views
+  //    Try NPE-compatible metrics first, then fall back to classic metrics.
+  //    Required permissions: read_insights + pages_read_engagement
   const sinceParam = since ? `&since=${since}` : "";
   const untilParam = until ? `&until=${until}` : "";
-  const metrics = "page_impressions_unique,page_post_engagements,page_views_total";
-  const insightsUrl = `${META_BASE_URL}/${pageId}/insights?metric=${metrics}&period=day${sinceParam}${untilParam}&access_token=${pageToken}`;
+
+  // Page Insights — requires read_insights + pages_read_engagement permissions.
+  // Try classic metrics first; if empty, try NPE-compatible subset.
+  const classicMetrics = "page_impressions_unique,page_post_engagements,page_views_total";
+  const npeMetrics = "page_impressions,page_views_total";
+
   let insightsData: any = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
+  let insightsError: string | null = null;
+
   try {
-    const r = await fetch(insightsUrl);
+    const classicUrl = `${META_BASE_URL}/${pageId}/insights?metric=${classicMetrics}&period=day${sinceParam}${untilParam}&access_token=${pageToken}`;
+    const r = await fetch(classicUrl);
     insightsData = await r.json();
-  } catch { /* no permission */ }
+    if (insightsData.error) {
+      insightsError = `${insightsData.error.type}: ${insightsData.error.message} (code ${insightsData.error.code})`;
+    }
+    // If classic returned empty (NPE page), try NPE-compatible metrics
+    if (!insightsData.data?.length && !insightsData.error) {
+      const npeUrl = `${META_BASE_URL}/${pageId}/insights?metric=${npeMetrics}&period=day${sinceParam}${untilParam}&access_token=${pageToken}`;
+      const r2 = await fetch(npeUrl);
+      const npeData = await r2.json();
+      if (npeData.data?.length) insightsData = npeData;
+      else if (npeData.error) insightsError = `NPE: ${npeData.error.message}`;
+    }
+  } catch (e: any) { insightsError = e.message; } // eslint-disable-line @typescript-eslint/no-explicit-any
 
   const getMetric = (name: string) =>
     insightsData.data?.find((m: any) => m.name === name); // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -71,8 +95,9 @@ async function getFacebookData(pageId: string, pageToken: string, since: string,
     totalShares += post.shares?.count || 0;
   }
 
-  const reach = sumMetric("page_impressions_unique");
-  const engagement = sumMetric("page_post_engagements");
+  // Support both NPE and classic metric names
+  const reach = sumMetric("page_impressions_unique") || sumMetric("page_impressions");
+  const engagement = sumMetric("page_post_engagements") || sumMetric("page_engaged_users");
   const pageViews = sumMetric("page_views_total");
 
   return {
@@ -104,10 +129,19 @@ async function getFacebookData(pageId: string, pageToken: string, since: string,
         (p.comments?.summary?.total_count || 0) +
         (p.shares?.count || 0),
     })),
-    // Daily time series for charts
-    reachTimeSeries: seriesOf("page_impressions_unique"),
-    engagementTimeSeries: seriesOf("page_post_engagements"),
+    // Daily time series for charts (try NPE metrics, then classic)
+    reachTimeSeries: seriesOf("page_impressions_unique").length ? seriesOf("page_impressions_unique") : seriesOf("page_impressions"),
+    engagementTimeSeries: seriesOf("page_post_engagements").length ? seriesOf("page_post_engagements") : seriesOf("page_engaged_users"),
     viewsTimeSeries: seriesOf("page_views_total"),
+    // Debug: surface insights API errors (remove once permissions are fixed)
+    _debug: {
+      insightsError,
+      pageName: pageData.name || "unknown",
+      pageDataOk: pageRes.ok,
+      pageId,
+      hasInsightsData: !!insightsData.data,
+      insightsMetricCount: insightsData.data?.length ?? 0,
+    },
   };
 }
 
@@ -210,7 +244,8 @@ export async function GET(request: NextRequest) {
   try {
     let data;
     const pageId = creds.metaPageId || "";
-    const pageToken = pageId ? await getPageAccessToken(pageId, accessToken) : accessToken;
+    const pageTokenResult = pageId ? await getPageAccessToken(pageId, accessToken) : { token: accessToken, source: "direct-system-token", pagesFound: 0 };
+    const pageToken = pageTokenResult.token;
 
     if (type === "ads" || type === "campaigns") {
       const adAccountId = creds.metaAdAccountId || "";
@@ -219,6 +254,18 @@ export async function GET(request: NextRequest) {
         : await getMetaAdsAccountInsights(adAccountId, accessToken, since, until);
     } else if (type === "facebook" || type === "facebook-page") {
       data = await getFacebookData(pageId, pageToken, since, until);
+      if (data._debug) {
+        data._debug.tokenSource = pageTokenResult.source;
+        data._debug.pagesFound = pageTokenResult.pagesFound;
+        // Check token permissions
+        try {
+          const permRes = await fetch(`${META_BASE_URL}/me/permissions?access_token=${accessToken}`);
+          const permData = await permRes.json();
+          data._debug.permissions = (permData.data || [])
+            .filter((p: any) => p.status === "granted") // eslint-disable-line @typescript-eslint/no-explicit-any
+            .map((p: any) => p.permission); // eslint-disable-line @typescript-eslint/no-explicit-any
+        } catch { /* ignore */ }
+      }
     } else if (type === "instagram" || type === "ig-profile" || type === "ig-media") {
       const igUserId = creds.metaIgUserId || "";
       data = await getInstagramData(igUserId, accessToken, pageId, pageToken, since, until);

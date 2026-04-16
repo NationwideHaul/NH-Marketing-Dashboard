@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import {
   LayoutDashboard, BarChart3, DollarSign, MapPin, Share2,
   PhoneCall, Megaphone, Layers, Mail, Wallet, TrendingUp, Link2, ChevronDown, Check,
-  PanelLeftClose, PanelLeftOpen, Database,
+  PanelLeftClose, PanelLeftOpen, Database, Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAccount } from "@/context/account-context";
@@ -165,6 +165,25 @@ export function Sidebar() {
           })}
         </ul>
       </nav>
+
+      {/* Settings link — shared across all accounts */}
+      <div className="border-t border-white/10 px-2 py-2">
+        <Link
+          href="/settings"
+          title={collapsed ? "Settings" : undefined}
+          className={cn(
+            "flex items-center rounded-lg transition-colors",
+            collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5",
+            pathname.startsWith("/settings")
+              ? "text-white font-medium"
+              : "text-white/60 hover:bg-white/5 hover:text-white"
+          )}
+          style={pathname.startsWith("/settings") ? { backgroundColor: currentAccount.colors.accent } : {}}
+        >
+          <Settings className="h-5 w-5 shrink-0" />
+          {!collapsed && <span className="text-sm whitespace-nowrap">Settings</span>}
+        </Link>
+      </div>
 
       {/* Collapse toggle + footer */}
       <div className="border-t border-white/10">

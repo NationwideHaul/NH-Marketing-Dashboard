@@ -135,11 +135,24 @@ export async function getMetaAdsAccountInsights(
   const fields = "impressions,clicks,spend,cpc,ctr,reach,actions,cost_per_action_type";
   const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
 
-  const url = `${META_BASE_URL}/${adAccountId}/insights?fields=${fields}&time_range=${timeRange}&time_increment=1&access_token=${accessToken}`;
+  const url = `${META_BASE_URL}/${adAccountId}/insights?fields=${fields}&time_range=${timeRange}&time_increment=1&limit=500&access_token=${accessToken}`;
 
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Meta Ads API error: ${response.status} ${await response.text()}`);
   }
-  return response.json();
+  const json = await response.json();
+
+  // Paginate to collect all daily rows (Meta defaults to 25 per page)
+  let allData = json.data || [];
+  let nextUrl = json.paging?.next;
+  while (nextUrl) {
+    const nextRes = await fetch(nextUrl);
+    if (!nextRes.ok) break;
+    const nextJson = await nextRes.json();
+    allData = allData.concat(nextJson.data || []);
+    nextUrl = nextJson.paging?.next;
+  }
+  json.data = allData;
+  return json;
 }
