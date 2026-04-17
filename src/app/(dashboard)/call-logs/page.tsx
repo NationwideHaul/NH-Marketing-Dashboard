@@ -78,6 +78,8 @@ function AgentCallsTab() {
   }));
 
   const ringcentralError = data?.data?.ringcentral?.error;
+  const syncedAt = data?.data?.ringcentral?.syncedAt as string | undefined;
+  const analyticsError = data?.data?.ringcentral?.analyticsError as string | undefined | null;
 
   // Ad-hoc dropdown filter within the account's assigned team members.
   // Defaults to "all assigned agents". Resets on account switch so it never
@@ -222,7 +224,14 @@ function AgentCallsTab() {
       )}
       {!isLoading && !ringcentralError && agents.length === 0 && (
         <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground mb-4">
-          No agent activity in the selected period. Check your RingCentral connection in Settings.
+          {analyticsError
+            ? `RingCentral is currently rate-limited (${analyticsError}). The background sync runs every 10 minutes — data will appear as soon as RingCentral lets us through.`
+            : "No agent activity in the selected period. Check your RingCentral connection in Settings."}
+          {syncedAt && (
+            <div className="mt-2 text-[10px] text-muted-foreground/70">
+              Last sync attempt: {new Date(syncedAt).toLocaleString()}
+            </div>
+          )}
         </div>
       )}
 
