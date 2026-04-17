@@ -3,6 +3,7 @@ import { format, subDays } from "date-fns";
 import { Redis } from "@upstash/redis";
 import { getCallAnalytics, getAgentCallStats } from "@/lib/api-clients/ringcentral";
 import { getAccountCredential } from "@/lib/credential-store";
+import { auth } from "@/lib/auth";
 
 // This route is hit by Vercel Cron every 10 min (see vercel.json). It fetches
 // the last-30-days RingCentral snapshot for every account and writes it to
@@ -111,13 +112,22 @@ async function runSync(req: NextRequest) {
   const authHeader = req.headers.get("authorization") || "";
   const isVercelCron = req.headers.get("x-vercel-cron") === "1";
   const isLocalhost = /^(127\.|localhost)/.test(req.headers.get("host") || "");
-  if (cronSecret) {
-    if (authHeader !== `Bearer ${cronSecret}` && !isVercelCron) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
-  } else if (!isVercelCron && !isLocalhost) {
+
+  // Accept the request if ANY of these match:
+  //   1. Vercel Cron (auto-authenticated via header)
+  //   2. Bearer token matching CRON_SECRET (manual curl from a trusted place)
+  //   3. Logged-in dashboard user (so you can hit it from a browser tab to
+  //      force a fresh snapshot without waiting for the daily cron)
+  //   4. localhost dev
+  let authed = isVercelCron || isLocalhost;
+  if (!authed && cronSecret && authHeader === `Bearer ${cronSecret}`) authed = true;
+  if (!authed) {
+    const session = await auth();
+    if (session?.user) authed = true;
+  }
+  if (!authed) {
     return NextResponse.json(
-      { ok: false, error: "CRON_SECRET not configured and request is not from Vercel Cron or localhost" },
+      { ok: false, error: "Unauthorized. Log in or use CRON_SECRET bearer token." },
       { status: 401 }
     );
   }
