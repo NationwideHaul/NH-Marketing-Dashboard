@@ -9,11 +9,11 @@ interface RCAuthResponse {
 }
 
 // Fetch with automatic retry on 429 (rate limit). Uses the Retry-After header
-// when present, otherwise exponential backoff: 2s, 5s, 10s, 15s. Max 4 attempts.
-// RingCentral uses a short sliding-window limit so waiting a few seconds is
-// usually enough for the next call to succeed.
-async function rcFetch(url: string, init: RequestInit, maxAttempts = 4): Promise<Response> {
-  const backoffSchedule = [2000, 5000, 10_000, 15_000];
+// when present, otherwise a short exponential backoff. Max 2 attempts (1 retry)
+// so the full request budget stays under ~6 s — prolonged rate limits should
+// surface to the UI fast instead of hanging for a minute.
+async function rcFetch(url: string, init: RequestInit, maxAttempts = 2): Promise<Response> {
+  const backoffSchedule = [2000, 4000];
   let attempt = 0;
   while (true) {
     const res = await fetch(url, init);
@@ -21,8 +21,8 @@ async function rcFetch(url: string, init: RequestInit, maxAttempts = 4): Promise
     const retryAfterHeader = res.headers.get("Retry-After");
     const retryAfterSec = retryAfterHeader ? parseInt(retryAfterHeader, 10) : NaN;
     const waitMs = Number.isFinite(retryAfterSec) && retryAfterSec > 0
-      ? Math.min(retryAfterSec * 1000, 20_000)
-      : backoffSchedule[attempt] ?? 15_000;
+      ? Math.min(retryAfterSec * 1000, 5000)
+      : backoffSchedule[attempt] ?? 4000;
     await new Promise((r) => setTimeout(r, waitMs));
     attempt++;
   }
