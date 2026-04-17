@@ -14,6 +14,40 @@ export const dynamic = "force-dynamic";
 
 const FIELD = "teamMemberExtensionIds";
 
+// We store the assignment as a CSV string instead of `JSON.stringify([...])`.
+// The @upstash/redis client auto-parses any JSON-looking value on read, so a
+// stringified array comes back as a real array — which then fails the
+// `typeof === "string"` check inside getAccountCredential() and the whole
+// credential resolves as "missing". CSV avoids the auto-parse entirely.
+// An empty selection is stored as the sentinel "__empty__" so we can still
+// distinguish "saved no one" from "never saved".
+const EMPTY_SENTINEL = "__empty__";
+
+function encodeIds(ids: string[]): string {
+  if (ids.length === 0) return EMPTY_SENTINEL;
+  return ids.join(",");
+}
+
+function decodeIds(raw: string): string[] | null {
+  if (!raw) return null;
+  if (raw === EMPTY_SENTINEL) return [];
+  // Back-compat: previous versions stored JSON-stringified arrays.
+  if (raw.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed.filter((x): x is string => typeof x === "string");
+      }
+    } catch {
+      return null;
+    }
+  }
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
 function isValidAccountId(accountId: string): boolean {
   const parent = accountId.replace(/-(rv|ttr)$/, "");
   return Boolean(getAccount(parent));
@@ -65,10 +99,7 @@ export async function GET(req: NextRequest) {
   try {
     const r = await getAccountCredential(accountId, FIELD);
     if (r.value) {
-      const parsed = JSON.parse(r.value) as unknown;
-      if (Array.isArray(parsed)) {
-        assignedIds = parsed.filter((x): x is string => typeof x === "string");
-      }
+      assignedIds = decodeIds(r.value);
     }
   } catch {
     assignedIds = null;
@@ -127,7 +158,7 @@ export async function PUT(req: NextRequest) {
   const cleaned = extensionIds.filter((x): x is string => typeof x === "string" && x.length > 0);
 
   try {
-    await setAccountCredential(accountId, FIELD, JSON.stringify(cleaned));
+    await setAccountCredential(accountId, FIELD, encodeIds(cleaned));
   } catch (err) {
     if (err instanceof KvNotConfiguredError) {
       return NextResponse.json({ ok: false, error: err.message }, { status: 503 });

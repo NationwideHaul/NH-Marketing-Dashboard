@@ -87,10 +87,35 @@ function AgentCallsTab() {
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
   const [directionFilter, setDirectionFilter] = useState<"all" | "inbound" | "outbound">("all");
 
+  // Reset the ad-hoc selection only when the account changes. Previously this
+  // also re-ran on every `agents.length` change, which meant each SWR refresh
+  // (every 5 min, focus, etc.) wiped whatever the user had picked in the
+  // dropdown. The backend already applies the persistent team-member
+  // assignment — this state is only an in-session narrower filter.
   useEffect(() => {
     setSelectedAgents(agents.map((a) => a.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agents.length, apiAccountId]);
+  }, [apiAccountId]);
+
+  // When agents first load (or the set of IDs changes because a new person was
+  // assigned in Settings), auto-include any new agent that wasn't in the old
+  // selection. Agents that have been un-assigned drop out naturally because
+  // they no longer exist in `agents`.
+  useEffect(() => {
+    setSelectedAgents((prev) => {
+      if (prev.length === 0) return agents.map((a) => a.id);
+      const known = new Set(prev);
+      const additions = agents.filter((a) => !known.has(a.id)).map((a) => a.id);
+      if (additions.length === 0) {
+        // Drop stale IDs that are no longer present.
+        const currentIds = new Set(agents.map((a) => a.id));
+        const filtered = prev.filter((id) => currentIds.has(id));
+        return filtered.length === prev.length ? prev : filtered;
+      }
+      return [...prev, ...additions];
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agents.map((a) => a.id).join(",")]);
 
   const filteredAgents = agents.filter((a) => selectedAgents.includes(a.id));
 

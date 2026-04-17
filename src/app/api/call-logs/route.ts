@@ -10,6 +10,21 @@ export const dynamic = "force-dynamic";
 // Cache company IDs
 const companyIdCache: Record<string, string> = {};
 
+// In-process cache for the RingCentral section of the response. RingCentral
+// rate-limits aggressively (429) and paginating the call-log can take 20–40s
+// on a cold call. The Call Logs page re-fetches on every mount / tab switch /
+// SWR focus, which compounds the problem. 60 s is short enough to stay fresh
+// and long enough to absorb back-to-back loads.
+const RC_CACHE_TTL_MS = 60 * 1000;
+interface RcCacheEntry {
+  expiresAt: number;
+  payload: Record<string, unknown>;
+}
+const rcResponseCache = new Map<string, RcCacheEntry>();
+function rcCacheKey(accountId: string, fromIso: string, toIso: string) {
+  return `${accountId}|${fromIso}|${toIso}`;
+}
+
 // Combined Call Logs endpoint -- merges RingCentral + CallRail
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -26,44 +41,91 @@ export async function GET(request: NextRequest) {
 
   // ===== RINGCENTRAL =====
   if ((source === "all" || source === "ringcentral") && process.env.RINGCENTRAL_CLIENT_ID) {
-    try {
-      const fromIso = new Date(startDate).toISOString();
-      const toIso = new Date(endDate + "T23:59:59").toISOString();
-      const [rcData, agents, assignment] = await Promise.all([
-        getCallAnalytics(fromIso, toIso),
-        getAgentCallStats(fromIso, toIso).catch((e) => {
-          console.error("RingCentral agents error:", e.message);
-          return [];
-        }),
-        getAccountCredential(dashboardAccountId, "teamMemberExtensionIds"),
-      ]);
+    const fromIso = new Date(startDate).toISOString();
+    const toIso = new Date(endDate + "T23:59:59").toISOString();
+    const cacheKey = rcCacheKey(dashboardAccountId, fromIso, toIso);
+    const cached = rcResponseCache.get(cacheKey);
+    const now = Date.now();
 
-      // Filter agents by per-account team-member assignment. If the account has
-      // no explicit assignment yet, fall back to showing every agent.
-      let filteredAgents = agents;
-      let assignedIds: string[] | null = null;
-      if (assignment.value) {
-        try {
-          const parsed = JSON.parse(assignment.value) as unknown;
-          if (Array.isArray(parsed)) {
-            assignedIds = parsed.filter((x): x is string => typeof x === "string");
+    if (cached && cached.expiresAt > now) {
+      result.data.ringcentral = cached.payload;
+    } else {
+      try {
+        // Each RC call can fail independently with 429. Keep errors isolated so
+        // the agents list can still render even if the aggregate analytics
+        // request got rate-limited (or vice versa).
+        const [rcResult, agents, assignment] = await Promise.all([
+          getCallAnalytics(fromIso, toIso).then(
+            (d) => ({ ok: true as const, data: d }),
+            (e: Error) => ({ ok: false as const, error: e.message })
+          ),
+          getAgentCallStats(fromIso, toIso).catch((e: Error) => {
+            console.error("RingCentral agents error:", e.message);
+            return [];
+          }),
+          getAccountCredential(dashboardAccountId, "teamMemberExtensionIds"),
+        ]);
+        const rcData = rcResult.ok ? rcResult.data : {
+          totalCalls: 0,
+          answered: 0,
+          missed: 0,
+          avgDuration: 0,
+          answerRate: 0,
+          records: [],
+        };
+        const rcError = rcResult.ok ? null : rcResult.error;
+
+        // Filter agents by per-account team-member assignment. If the account has
+        // no explicit assignment yet, fall back to showing every agent.
+        // Stored as CSV (or "__empty__" sentinel) — see api/settings/team-members/route.ts
+        // for why we don't use JSON.stringify.
+        let filteredAgents = agents;
+        let assignedIds: string[] | null = null;
+        if (assignment.value) {
+          const raw = assignment.value;
+          if (raw === "__empty__") {
+            assignedIds = [];
+          } else if (raw.startsWith("[")) {
+            // Back-compat: previous JSON-stringified values.
+            try {
+              const parsed = JSON.parse(raw) as unknown;
+              if (Array.isArray(parsed)) {
+                assignedIds = parsed.filter((x): x is string => typeof x === "string");
+              }
+            } catch {
+              assignedIds = null;
+            }
+          } else {
+            assignedIds = raw
+              .split(",")
+              .map((s) => s.trim())
+              .filter((s) => s.length > 0);
           }
-        } catch {
-          assignedIds = null;
         }
-      }
-      if (assignedIds) {
-        const allowed = new Set(assignedIds);
-        filteredAgents = agents.filter((a) => allowed.has(a.extensionId));
-      }
+        if (assignedIds) {
+          const allowed = new Set(assignedIds);
+          filteredAgents = agents.filter((a) => allowed.has(a.extensionId));
+        }
 
-      result.data.ringcentral = {
-        ...rcData,
-        agents: filteredAgents,
-        teamAssignment: assignedIds ? { assigned: true, count: assignedIds.length } : { assigned: false, count: null },
-      };
-    } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-      result.data.ringcentral = { error: error.message };
+        const payload: Record<string, unknown> = {
+          ...rcData,
+          agents: filteredAgents,
+          teamAssignment: assignedIds ? { assigned: true, count: assignedIds.length } : { assigned: false, count: null },
+        };
+        // Surface rcError only when we also have no agents — otherwise the UI
+        // can still be useful even though the aggregate totals are stale.
+        if (rcError && filteredAgents.length === 0) {
+          payload.error = rcError;
+        }
+        // Only cache a "good" payload (with agents) so the next refresh can
+        // retry if this one was partial/empty.
+        if (filteredAgents.length > 0) {
+          rcResponseCache.set(cacheKey, { expiresAt: now + RC_CACHE_TTL_MS, payload });
+        }
+        result.data.ringcentral = payload;
+      } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+        result.data.ringcentral = { error: error.message };
+      }
     }
   }
 

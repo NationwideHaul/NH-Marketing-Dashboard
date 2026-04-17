@@ -8,6 +8,26 @@ interface RCAuthResponse {
   expires_in: number;
 }
 
+// Fetch with automatic retry on 429 (rate limit). Uses the Retry-After header
+// when present, otherwise exponential backoff: 2s, 5s, 10s, 15s. Max 4 attempts.
+// RingCentral uses a short sliding-window limit so waiting a few seconds is
+// usually enough for the next call to succeed.
+async function rcFetch(url: string, init: RequestInit, maxAttempts = 4): Promise<Response> {
+  const backoffSchedule = [2000, 5000, 10_000, 15_000];
+  let attempt = 0;
+  while (true) {
+    const res = await fetch(url, init);
+    if (res.status !== 429 || attempt >= maxAttempts - 1) return res;
+    const retryAfterHeader = res.headers.get("Retry-After");
+    const retryAfterSec = retryAfterHeader ? parseInt(retryAfterHeader, 10) : NaN;
+    const waitMs = Number.isFinite(retryAfterSec) && retryAfterSec > 0
+      ? Math.min(retryAfterSec * 1000, 20_000)
+      : backoffSchedule[attempt] ?? 15_000;
+    await new Promise((r) => setTimeout(r, waitMs));
+    attempt++;
+  }
+}
+
 async function getBaseUrl(): Promise<string> {
   const { value } = await getCredential("RINGCENTRAL_SERVER_URL");
   return value || "https://platform.ringcentral.com";
@@ -42,7 +62,7 @@ async function getAccessToken(): Promise<{ token: string; baseUrl: string }> {
       throw new Error("RingCentral credentials not configured");
     }
 
-    const response = await fetch(`${baseUrl}/restapi/oauth/token`, {
+    const response = await rcFetch(`${baseUrl}/restapi/oauth/token`, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -87,7 +107,7 @@ export async function getCallLog(
     view: "Detailed",
   });
 
-  const response = await fetch(
+  const response = await rcFetch(
     `${baseUrl}/restapi/v1.0/account/~/call-log?${params}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
@@ -102,38 +122,67 @@ export async function getCallLog(
 // ========== AGENTS / EXTENSIONS ==========
 // List every user extension on the account. Used to map extension IDs to
 // human-readable names (first/last) and extension numbers.
-export async function listExtensions() {
-  const { token, baseUrl } = await getAccessToken();
-  const all: Array<Record<string, unknown>> = [];
-  let page = 1;
-  const perPage = 100;
+// Cached in-process for 5 minutes — extensions rarely change and this endpoint
+// is hit from multiple routes (/api/call-logs, /api/settings/team-members).
+// Concurrent callers share the same in-flight promise.
+interface ExtensionRecord {
+  id: string;
+  extensionNumber: string;
+  name: string;
+  type: string;
+  status: string;
+}
+const EXT_CACHE_TTL_MS = 5 * 60 * 1000;
+let cachedExtensions: { value: ExtensionRecord[]; expiresAt: number } | null = null;
+let inflightExtensions: Promise<ExtensionRecord[]> | null = null;
 
-  while (page <= 20) { // safety cap
-    const res = await fetch(
-      `${baseUrl}/restapi/v1.0/account/~/extension?perPage=${perPage}&page=${page}&type=User`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    if (!res.ok) throw new Error(`RingCentral extensions error: ${res.status}`);
-    const data = await res.json();
-    const records = (data.records || []) as Array<Record<string, unknown>>;
-    all.push(...records);
-    if (records.length < perPage) break;
-    page++;
+export async function listExtensions(): Promise<ExtensionRecord[]> {
+  const now = Date.now();
+  if (cachedExtensions && cachedExtensions.expiresAt > now) {
+    return cachedExtensions.value;
   }
+  if (inflightExtensions) return inflightExtensions;
 
-  return all.map((r) => {
-    const contact = (r.contact as { firstName?: string; lastName?: string } | undefined) || {};
-    const firstName = contact.firstName || "";
-    const lastName = contact.lastName || "";
-    const name = [firstName, lastName].filter(Boolean).join(" ") || String(r.name || "Unknown");
-    return {
-      id: String(r.id),
-      extensionNumber: String(r.extensionNumber || ""),
-      name,
-      type: String(r.type || ""),
-      status: String(r.status || ""),
-    };
+  inflightExtensions = (async () => {
+    const { token, baseUrl } = await getAccessToken();
+    const all: Array<Record<string, unknown>> = [];
+    let page = 1;
+    const perPage = 100;
+
+    while (page <= 20) { // safety cap
+      const res = await rcFetch(
+        `${baseUrl}/restapi/v1.0/account/~/extension?perPage=${perPage}&page=${page}&type=User`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) throw new Error(`RingCentral extensions error: ${res.status}`);
+      const data = await res.json();
+      const records = (data.records || []) as Array<Record<string, unknown>>;
+      all.push(...records);
+      if (records.length < perPage) break;
+      page++;
+    }
+
+    const mapped: ExtensionRecord[] = all.map((r) => {
+      const contact = (r.contact as { firstName?: string; lastName?: string } | undefined) || {};
+      const firstName = contact.firstName || "";
+      const lastName = contact.lastName || "";
+      const name = [firstName, lastName].filter(Boolean).join(" ") || String(r.name || "Unknown");
+      return {
+        id: String(r.id),
+        extensionNumber: String(r.extensionNumber || ""),
+        name,
+        type: String(r.type || ""),
+        status: String(r.status || ""),
+      };
+    });
+
+    cachedExtensions = { value: mapped, expiresAt: Date.now() + EXT_CACHE_TTL_MS };
+    return mapped;
+  })().finally(() => {
+    inflightExtensions = null;
   });
+
+  return inflightExtensions;
 }
 
 // Get per-agent call stats for the period.
@@ -172,7 +221,7 @@ async function fetchDetailedCallLog(
       page: String(page),
       view: "Detailed",
     });
-    const res = await fetch(
+    const res = await rcFetch(
       `${baseUrl}/restapi/v1.0/account/~/call-log?${params}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
@@ -347,7 +396,7 @@ export async function getCallAnalytics(
       perPage: String(perPage),
       page: String(page),
     });
-    const response = await fetch(
+    const response = await rcFetch(
       `${baseUrl}/restapi/v1.0/account/~/call-log?${params}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
