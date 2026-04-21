@@ -55,28 +55,39 @@ interface LivePlatformData {
   calls: Record<string, number>;
 }
 
-function useLivePlatformData(accountId: string, startDate: string, endDate: string) {
+function useLivePlatformData(
+  accountId: string,
+  startDate: string,
+  endDate: string,
+  platforms: PlatformData[],
+) {
   const [data, setData] = useState<LivePlatformData | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (accountId !== "nationwide-haul") return;
+    // NH pulls info submits from the NH Sales CRM + calls from CallRail.
+    // NHTTR pulls ONLY calls from CallRail (per-platform); its info submits
+    // come from GA4 website forms and are shown as a single top-level stat.
+    // NFI's full live pipeline (CRM filtered by "NFI Truck Sales" tag) is not
+    // wired yet — leave as pending.
+    const supported = accountId === "nationwide-haul" || accountId === "nhttr";
+    if (!supported) return;
 
     let cancelled = false;
     setLoading(true);
 
-    // Fetch CRM info submits + CallRail calls in parallel
-    Promise.all([
-      fetch(`/api/inventory-platform-leads?startDate=${startDate}&endDate=${endDate}`)
-        .then((r) => r.json())
-        .catch(() => null),
-      fetch(`/api/callrail?startDate=${startDate}&endDate=${endDate}&accountId=${accountId}`)
-        .then((r) => r.json())
-        .catch(() => null),
-    ]).then(([crmRes, callRes]) => {
+    const crmPromise = accountId === "nationwide-haul"
+      ? fetch(`/api/inventory-platform-leads?startDate=${startDate}&endDate=${endDate}`)
+          .then((r) => r.json())
+          .catch(() => null)
+      : Promise.resolve(null);
+    const callPromise = fetch(`/api/callrail?startDate=${startDate}&endDate=${endDate}&accountId=${accountId}`)
+      .then((r) => r.json())
+      .catch(() => null);
+
+    Promise.all([crmPromise, callPromise]).then(([crmRes, callRes]) => {
       if (cancelled) return;
 
-      // Aggregate CRM info submits by platform
       const infoSubmits: Record<string, number> = {};
       if (crmRes?.status === "live" && crmRes.data) {
         for (const entry of crmRes.data) {
@@ -87,13 +98,16 @@ function useLivePlatformData(accountId: string, startDate: string, endDate: stri
         }
       }
 
-      // Map CallRail tracker breakdown to platforms
+      // Map CallRail tracker breakdown to platforms. Prefer the per-platform
+      // `trackerName` configured in inventory-platforms-data.ts; fall back to
+      // the legacy TRACKER_TO_PLATFORM pattern list for NH's tracker names.
       const calls: Record<string, number> = {};
       if (callRes?.status === "live" && callRes.data?.trackerBreakdown) {
         for (const { tracker, count } of callRes.data.trackerBreakdown) {
-          const platform = trackerToPlatform(tracker);
-          if (platform) {
-            calls[platform] = (calls[platform] || 0) + count;
+          const direct = platforms.find((p) => p.trackerName && tracker.includes(p.trackerName));
+          const platformName = direct?.name ?? trackerToPlatform(tracker);
+          if (platformName) {
+            calls[platformName] = (calls[platformName] || 0) + count;
           }
         }
       }
@@ -102,7 +116,7 @@ function useLivePlatformData(accountId: string, startDate: string, endDate: stri
     }).finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-  }, [accountId, startDate, endDate]);
+  }, [accountId, startDate, endDate, platforms]);
 
   return { data, loading };
 }
@@ -164,33 +178,40 @@ function daysUntilRenewal(renewalDate?: string): number | null {
   return differenceInDays(parseISO(renewalDate), new Date());
 }
 
-// Hook: fetch CRM service lead count for NHTTR info submits
-function useNHTTRInfoSubmits(startDate: string, endDate: string) {
+// Hook: NHTTR info submits = website form submissions, tracked as GA4 conversions
+// on the NHTTR RV/TTR property. NOT sourced from the NH Sales CRM.
+function useNHTTRInfoSubmits(accountId: string, startDate: string, endDate: string) {
   const [count, setCount] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/nationwide-haul-crm?metric=leads&startDate=${startDate}&endDate=${endDate}`)
+    fetch(`/api/google-analytics?startDate=${startDate}&endDate=${endDate}&accountId=${accountId}`)
       .then((r) => r.json())
       .then((res) => {
-        if (cancelled || res.status !== "live" || !res.data) return;
-        const serviceEntry = res.data.byType?.find((t: { type: string; count: number }) => t.type === "service");
-        setCount(serviceEntry?.count ?? 0);
+        if (cancelled || res.status !== "live" || !res.data?.rows) return;
+        // GA4 metrics array order (see google.ts getGA4Data):
+        //   0 sessions, 1 totalUsers, 2 screenPageViews, 3 bounceRate,
+        //   4 averageSessionDuration, 5 conversions
+        let total = 0;
+        for (const row of res.data.rows) {
+          total += parseFloat(row.metricValues?.[5]?.value || "0");
+        }
+        setCount(Math.round(total));
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [startDate, endDate]);
+  }, [accountId, startDate, endDate]);
 
   return count;
 }
 
 // NHTTR-style view: calls per platform, expandable chart, editable budget, comparison table
 function NHTTRPlatformView({ platforms: rawPlatforms }: { platforms: PlatformData[] }) {
-  const { currentAccount } = useAccount();
+  const { currentAccount, apiAccountId } = useAccount();
   const { dateRange } = useDateRange();
   const startStr = fmtDate(dateRange.from, "yyyy-MM-dd");
   const endStr = fmtDate(dateRange.to, "yyyy-MM-dd");
-  const infoSubmits = useNHTTRInfoSubmits(startStr, endStr);
+  const infoSubmits = useNHTTRInfoSubmits(apiAccountId, startStr, endStr);
 
   // Load persistent annual cost + renewal date overrides from localStorage
   const overrideStorageKey = `nh-platform-overrides-${currentAccount.id}`;
@@ -773,7 +794,7 @@ export default function InventoryPlatformsPage() {
   const isNHTTR = currentAccount.id === "nhttr";
   const startStr = fmtDate(dateRange.from, "yyyy-MM-dd");
   const endStr = fmtDate(dateRange.to, "yyyy-MM-dd");
-  const { data: liveData, loading } = useLivePlatformData(currentAccount.id, startStr, endStr);
+  const { data: liveData, loading } = useLivePlatformData(currentAccount.id, startStr, endStr, staticPlatforms);
 
   // Merge live CRM + CallRail data into platform cards
   const platforms = useMemo(

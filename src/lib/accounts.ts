@@ -109,7 +109,7 @@ export const accounts: SubAccount[] = [
       ghlLocationId: "bQFOVHhca9fD7V3faeS1",
     },
     website: "nfitrucksales.com",
-    inventoryPlatforms: ["NFI Website", "TruckPaper", "My Little Salesman", "Commercial Truck Trader", "Cherry Trader"],
+    inventoryPlatforms: ["NFI Website", "NH Website", "TruckPaper", "My Little Salesman"],
   },
   {
     id: "nhttr",
@@ -179,8 +179,8 @@ export const accounts: SubAccount[] = [
     website: "roadreadyinsurance.com",
     config: {
       ga4PropertyId: "350112166",
-      ghlLocationId: "RRI-GHL",
-      metaAdAccountId: "RRI-META",
+      ghlLocationId: "PEN2IZLLlQwf1PpQJhyx",
+      metaAdAccountId: "act_614568808074594",
     },
   },
 ];

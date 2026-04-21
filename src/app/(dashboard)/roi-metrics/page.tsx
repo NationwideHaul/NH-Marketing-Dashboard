@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   TrendingUp, TrendingDown, Minus, HelpCircle, X, ChevronDown,
   DollarSign, Target, Users, BarChart3, Percent, ArrowRight,
@@ -15,6 +15,38 @@ import { useDateRange } from "@/context/date-range-context";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { generateTimeSeries, aggregateMonthly, aggregateMonthlyAvg } from "@/lib/mock-data/generator";
 import { platformMetricConfigs } from "@/lib/mock-data/platform-configs";
+
+// NHTTR pulls real revenue from FullBay. Fetches a 12-month window and
+// returns { "MMM yy": dollars }. Returns null while loading or on error so
+// the caller can fall back to mock data without flashing empty values.
+function useFullbayMonthlyRevenue(accountId: string): Record<string, number> | null {
+  const [data, setData] = useState<Record<string, number> | null>(null);
+  useEffect(() => {
+    if (!accountId.startsWith("nhttr")) { setData(null); return; }
+    let cancelled = false;
+    const end = new Date();
+    const start = subMonths(startOfMonth(end), 11);
+    const startStr = format(start, "yyyy-MM-dd");
+    const endStr = format(end, "yyyy-MM-dd");
+    fetch(`/api/fullbay?type=summary&startDate=${startStr}&endDate=${endStr}&accountId=${accountId}`)
+      .then((r) => r.json())
+      .then((res) => {
+        if (cancelled || res.status !== "live" || !res.data?.timeSeries) return;
+        const byMonth: Record<string, number> = {};
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        for (const p of res.data.timeSeries as { date: string; value: number }[]) {
+          const yr = p.date.substring(2, 4);
+          const mo = parseInt(p.date.substring(5, 7), 10);
+          const label = `${monthNames[mo - 1]} ${yr}`;
+          byMonth[label] = (byMonth[label] || 0) + p.value;
+        }
+        setData(byMonth);
+      })
+      .catch(() => { if (!cancelled) setData(null); });
+    return () => { cancelled = true; };
+  }, [accountId]);
+  return data;
+}
 
 // ========== METRIC DEFINITIONS (for ? tooltips) ==========
 const metricDefinitions: Record<string, { title: string; definition: string; formula: string }> = {
@@ -260,12 +292,13 @@ function ChartModal({
 
 // ========== MAIN PAGE ==========
 export default function ROIMetricsPage() {
-  const { currentAccount } = useAccount();
+  const { currentAccount, apiAccountId } = useAccount();
   const { dateRange } = useDateRange();
   const COLORS = currentAccount.chartPalette;
   const primary = currentAccount.colors.primary;
   const secondary = currentAccount.colors.secondary;
   const [expandedMetric, setExpandedMetric] = useState<string | null>(null);
+  const fullbayRevenue = useFullbayMonthlyRevenue(apiAccountId);
 
   // Generate 12 months of data for all metrics
   const monthlyData = useMemo(() => {
@@ -314,8 +347,18 @@ export default function ROIMetricsPage() {
       result[`ga-${config.key}`] = monthly.map(toMonthLabel);
     }
 
+    // NHTTR: overlay FullBay real revenue onto the mock-generated series so
+    // the rest of the page (ROAS, MER, ROI, revenueGrowth) recomputes against
+    // real dollars. Months missing from FullBay keep the mock value.
+    if (fullbayRevenue && result.revenue) {
+      result.revenue = result.revenue.map((p) => ({
+        month: p.month,
+        value: fullbayRevenue[p.month] ?? p.value,
+      }));
+    }
+
     return result;
-  }, [dateRange.to]);
+  }, [dateRange.to, fullbayRevenue]);
 
   // Compute current period values (last month's data)
   const current = useMemo(() => {

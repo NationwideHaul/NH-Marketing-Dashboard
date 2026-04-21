@@ -41,6 +41,7 @@ export interface WidgetConfig {
   manualValue?: number; // For manual-stat widgets: default value (editable by user, persisted in localStorage)
   sectionTitle?: string; // For section-header widgets: display title
   trendMonths?: number; // For chart widgets: override date range to show N months of data
+  tracker?: string; // For callrail widgets: filter to a specific tracker name (e.g. "Truck Paper") from the company's trackerBreakdown
 }
 
 export interface LayoutItem {

@@ -126,6 +126,9 @@ const STATIC_CREDENTIALS: Record<string, StaticAccountCredentials> = {
     callrailCompanyId: "753432103",
     ghlLocationId: "PEN2IZLLlQwf1PpQJhyx",
     ghlApiKeyEnvSuffix: "ROAD_READY",
+    metaAdAccountId: "act_614568808074594",
+    metaPageId: "109737194149629",
+    metaIgUserId: "17841438963053106",
   },
 };
 

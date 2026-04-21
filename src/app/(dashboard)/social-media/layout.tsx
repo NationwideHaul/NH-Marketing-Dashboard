@@ -3,13 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useAccount } from "@/context/account-context";
 
-const subTabs = [
+const allSubTabs = [
   { label: "Facebook", href: "/social-media" },
   { label: "Instagram", href: "/social-media/instagram" },
   { label: "YouTube", href: "/social-media/youtube" },
   { label: "LinkedIn", href: "/social-media/linkedin" },
 ];
+
+// Per-account hidden sub-tabs. Road Ready Insurance has no YouTube channel.
+const hiddenSubTabsByAccount: Record<string, string[]> = {
+  "road-ready": ["/social-media/youtube"],
+};
 
 export default function SocialMediaLayout({
   children,
@@ -17,6 +23,9 @@ export default function SocialMediaLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { currentAccount } = useAccount();
+  const hidden = hiddenSubTabsByAccount[currentAccount.id] ?? [];
+  const subTabs = allSubTabs.filter((t) => !hidden.includes(t.href));
 
   return (
     <div>

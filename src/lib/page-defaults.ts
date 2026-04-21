@@ -327,7 +327,7 @@ export const nfiOverviewDefaults: PageDefault = {
     { id: "nfi-7", type: "stat", title: "PPC Identified Conversions", dataSource: "google-ads", metric: "conversions", format: "number", comparisonEnabled: true },
     // Row 3: Calls & Truck Paper
     { id: "nfi-8", type: "stat", title: "Total Phone Calls (CallRail)", dataSource: "callrail", metric: "totalCalls", format: "number", comparisonEnabled: true },
-    { id: "nfi-9", type: "stat", title: "Truck Paper Phone Calls", dataSource: "callrail", metric: "firstTimeCalls", format: "number", comparisonEnabled: true },
+    { id: "nfi-9", type: "stat", title: "Truck Paper Phone Calls", dataSource: "callrail", metric: "totalCalls", format: "number", comparisonEnabled: true, tracker: "Truck Paper" },
     { id: "nfi-10", type: "stat", title: "Truck Paper Info Submits", dataSource: "google-analytics", metric: "conversions", format: "number", comparisonEnabled: true },
     { id: "nfi-12", type: "manual-stat", title: "Banner Ad Clicks (Truck Paper)", dataSource: "overview", metric: "bannerClicks", format: "number", manualValue: 0 },
     // Section: Trends Over Time

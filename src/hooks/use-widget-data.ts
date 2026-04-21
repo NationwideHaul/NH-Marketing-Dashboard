@@ -66,7 +66,7 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
   if (!data || data.status === "error") return null;
 
   // Extract the metric from the API response
-  const metricValue = extractMetric(data, config.metric, config.dataSource);
+  const metricValue = extractMetric(data, config.metric, config.dataSource, config.tracker);
   if (metricValue === null) return null;
 
   // Compute trend vs previous period
@@ -74,7 +74,7 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
   let changePercent = 0;
 
   if (config.comparisonEnabled && prevData && prevData.status !== "error") {
-    const prevValue = extractMetric(prevData, config.metric, config.dataSource);
+    const prevValue = extractMetric(prevData, config.metric, config.dataSource, config.tracker);
     if (prevValue !== null && prevValue !== 0) {
       changePercent = ((metricValue - prevValue) / prevValue) * 100;
       trend = changePercent > 0 ? "up" : changePercent < 0 ? "down" : "flat";
@@ -149,7 +149,7 @@ export function useWidgetAllMetrics(config: WidgetConfig): KPIMetric[] {
 
 // ========== DATA EXTRACTION HELPERS ==========
 
-function extractMetric(apiResponse: any, metric: string, dataSource: string): number | null { // eslint-disable-line @typescript-eslint/no-explicit-any
+function extractMetric(apiResponse: any, metric: string, dataSource: string, tracker?: string): number | null { // eslint-disable-line @typescript-eslint/no-explicit-any
   const d = apiResponse.data;
   if (!d) {
     // Some routes return metrics at top level
@@ -173,7 +173,18 @@ function extractMetric(apiResponse: any, metric: string, dataSource: string): nu
   }
 
   // CallRail format
-  if (dataSource === "callrail" && d[metric] !== undefined) return d[metric];
+  if (dataSource === "callrail") {
+    // When a `tracker` filter is set, return the call count for that tracker
+    // from the breakdown (substring match — CallRail tracker names often
+    // contain extra suffixes like "- TruckPaper Banner").
+    if (tracker && Array.isArray(d.trackerBreakdown)) {
+      const match = d.trackerBreakdown.find((t: { tracker: string; count: number }) =>
+        t.tracker.toLowerCase().includes(tracker.toLowerCase())
+      );
+      return match ? match.count : 0;
+    }
+    if (d[metric] !== undefined) return d[metric];
+  }
 
   // GHL format
   if (dataSource === "email-marketing") {

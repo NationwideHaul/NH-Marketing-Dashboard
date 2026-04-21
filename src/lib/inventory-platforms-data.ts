@@ -16,6 +16,10 @@ export interface PlatformData {
   billingCycle: "monthly" | "annual";
   annualCost?: number;
   renewalDate?: string; // "YYYY-MM-DD"
+  /** CallRail tracker name to match against c.source_name / tracker.name. */
+  trackerName?: string;
+  /** Tracked phone number (display only — match is by trackerName). */
+  trackingNumber?: string;
   monthlyData: { month: string; calls: number; infoSubmits: number; leads: number; price: number }[];
 }
 
@@ -104,7 +108,8 @@ const nhPlatforms: PlatformData[] = [
 ];
 
 // NHTTR — service/repair listing platforms (annual billing, linked to CallRail "NH Repair Shops")
-// monthlyData.calls will come from CallRail — placeholder data for now
+// monthlyData is placeholder; live calls come from CallRail by trackerName, live info
+// submits come from GA4 website form conversions (wired in inventory-platforms page).
 const nhttrPlatforms: PlatformData[] = [
   {
     name: "NTTS",
@@ -114,6 +119,8 @@ const nhttrPlatforms: PlatformData[] = [
     billingCycle: "annual",
     annualCost: 100,
     renewalDate: "2026-04-02",
+    trackerName: "NTTS",
+    trackingNumber: "863-591-6481",
     monthlyData: [
       { month: "Oct 25", calls: 12, infoSubmits: 0, leads: 12, price: 0 },
       { month: "Nov 25", calls: 8, infoSubmits: 0, leads: 8, price: 0 },
@@ -131,6 +138,8 @@ const nhttrPlatforms: PlatformData[] = [
     billingCycle: "annual",
     annualCost: 996,
     renewalDate: "2026-06-28",
+    trackerName: "Find Truck Service",
+    trackingNumber: "863-343-2374",
     monthlyData: [
       { month: "Oct 25", calls: 22, infoSubmits: 0, leads: 22, price: 0 },
       { month: "Nov 25", calls: 17, infoSubmits: 0, leads: 17, price: 0 },
@@ -148,6 +157,8 @@ const nhttrPlatforms: PlatformData[] = [
     billingCycle: "annual",
     annualCost: 430,
     renewalDate: "2026-07-14",
+    trackerName: "TruckDown",
+    trackingNumber: "863-343-3154",
     monthlyData: [
       { month: "Oct 25", calls: 9, infoSubmits: 0, leads: 9, price: 0 },
       { month: "Nov 25", calls: 6, infoSubmits: 0, leads: 6, price: 0 },
@@ -159,7 +170,9 @@ const nhttrPlatforms: PlatformData[] = [
   },
 ];
 
-// NFI Truck Sales — same structure as NH but different platforms
+// NFI Truck Sales — listing platforms. Data pipeline TODO:
+//   - calls: from CallRail NFI company (182573673), filtered by trackerName
+//   - infoSubmits: from NH Sales CRM filtered by NFI tag ("NFI Truck Sales")
 const nfiPlatforms: PlatformData[] = [
   {
     name: "NFI Website",
@@ -167,6 +180,16 @@ const nfiPlatforms: PlatformData[] = [
     color: "#075895",
     pricePerMonth: 195,
     billingCycle: "monthly",
+    trackerName: "NFI Website",
+    monthlyData: [],
+  },
+  {
+    name: "NH Website",
+    fullName: "Nationwide Haul Website",
+    color: "#BE1E23",
+    pricePerMonth: 195,
+    billingCycle: "monthly",
+    trackerName: "NH Website",
     monthlyData: [],
   },
   {
@@ -175,6 +198,7 @@ const nfiPlatforms: PlatformData[] = [
     color: "#002B54",
     pricePerMonth: 6800,
     billingCycle: "monthly",
+    trackerName: "Truck Paper",
     monthlyData: [],
   },
   {
@@ -183,22 +207,7 @@ const nfiPlatforms: PlatformData[] = [
     color: "#0284C7",
     pricePerMonth: 895,
     billingCycle: "monthly",
-    monthlyData: [],
-  },
-  {
-    name: "Commercial Truck Trader",
-    fullName: "Commercial Truck Trader",
-    color: "#0891B2",
-    pricePerMonth: 1200,
-    billingCycle: "monthly",
-    monthlyData: [],
-  },
-  {
-    name: "Cherry Trader",
-    fullName: "Cherry Trader",
-    color: "#D97706",
-    pricePerMonth: 500,
-    billingCycle: "monthly",
+    trackerName: "My Little Salesman",
     monthlyData: [],
   },
 ];
