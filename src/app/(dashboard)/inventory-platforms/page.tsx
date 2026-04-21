@@ -178,40 +178,9 @@ function daysUntilRenewal(renewalDate?: string): number | null {
   return differenceInDays(parseISO(renewalDate), new Date());
 }
 
-// Hook: NHTTR info submits = website form submissions, tracked as GA4 conversions
-// on the NHTTR RV/TTR property. NOT sourced from the NH Sales CRM.
-function useNHTTRInfoSubmits(accountId: string, startDate: string, endDate: string) {
-  const [count, setCount] = useState<number | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`/api/google-analytics?startDate=${startDate}&endDate=${endDate}&accountId=${accountId}`)
-      .then((r) => r.json())
-      .then((res) => {
-        if (cancelled || res.status !== "live" || !res.data?.rows) return;
-        // GA4 metrics array order (see google.ts getGA4Data):
-        //   0 sessions, 1 totalUsers, 2 screenPageViews, 3 bounceRate,
-        //   4 averageSessionDuration, 5 conversions
-        let total = 0;
-        for (const row of res.data.rows) {
-          total += parseFloat(row.metricValues?.[5]?.value || "0");
-        }
-        setCount(Math.round(total));
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [accountId, startDate, endDate]);
-
-  return count;
-}
-
 // NHTTR-style view: calls per platform, expandable chart, editable budget, comparison table
 function NHTTRPlatformView({ platforms: rawPlatforms }: { platforms: PlatformData[] }) {
-  const { currentAccount, apiAccountId } = useAccount();
-  const { dateRange } = useDateRange();
-  const startStr = fmtDate(dateRange.from, "yyyy-MM-dd");
-  const endStr = fmtDate(dateRange.to, "yyyy-MM-dd");
-  const infoSubmits = useNHTTRInfoSubmits(apiAccountId, startStr, endStr);
+  const { currentAccount } = useAccount();
 
   // Load persistent annual cost + renewal date overrides from localStorage
   const overrideStorageKey = `nh-platform-overrides-${currentAccount.id}`;
@@ -277,7 +246,7 @@ function NHTTRPlatformView({ platforms: rawPlatforms }: { platforms: PlatformDat
   return (
     <div>
       {/* Top Stats Banner */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-xs text-muted-foreground font-medium">Total Annual Budget</p>
           <p className="text-2xl font-bold text-foreground">{formatCurrency(totalAnnual)}<span className="text-sm font-normal text-muted-foreground">/year</span></p>
@@ -285,18 +254,6 @@ function NHTTRPlatformView({ platforms: rawPlatforms }: { platforms: PlatformDat
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-xs text-muted-foreground font-medium">Calls This Month</p>
           <p className="text-2xl font-bold text-foreground">{platforms.reduce((sum, p) => sum + getCurrentCalls(p), 0)}</p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4">
-          <div className="flex items-center gap-1.5">
-            <p className="text-xs text-muted-foreground font-medium">Website Info Submits</p>
-            {infoSubmits !== null && (
-              <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">CRM Live</span>
-            )}
-          </div>
-          <p className="text-2xl font-bold text-foreground">
-            {infoSubmits === null ? <span className="text-muted-foreground">—</span> : formatNumber(infoSubmits)}
-          </p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Service leads from nhtrucktrailerrepair.com</p>
         </div>
       </div>
 
@@ -809,7 +766,9 @@ export default function InventoryPlatformsPage() {
           <h2 className="text-lg font-bold text-foreground">Inventory Platforms</h2>
           {loading && <RefreshCw className="h-4 w-4 text-muted-foreground animate-spin" />}
           {liveData && !loading && (
-            <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">CRM Live</span>
+            <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">
+              {isNHTTR ? "Live" : "CRM Live"}
+            </span>
           )}
         </div>
         <p className="text-sm text-muted-foreground">

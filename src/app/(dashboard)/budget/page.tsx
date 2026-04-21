@@ -32,21 +32,20 @@ const accountBudgets: Record<string, BudgetRow[]> = {
   ],
   "nfi-truck-sales": [
     { platform: "Google Ads", budget: 4000, spent: 0, category: "advertising" },
-    { platform: "TruckPaper", budget: 5200, spent: 5200, category: "platform" },
+    { platform: "TruckPaper", budget: 6800, spent: 6800, category: "platform" },
     { platform: "My Little Salesman", budget: 895, spent: 895, category: "platform" },
-    { platform: "Commercial Truck Trader", budget: 950, spent: 950, category: "platform" },
-    { platform: "Cherry Trader", budget: 500, spent: 500, category: "platform" },
-    { platform: "NFI Website", budget: 150, spent: 150, category: "platform" },
+    { platform: "NFI Website", budget: 195, spent: 195, category: "platform" },
+    { platform: "NH Website", budget: 195, spent: 195, category: "platform" },
     { platform: "Go High Level", budget: 297, spent: 297, category: "tools" },
     { platform: "CallRail", budget: 145, spent: 145, category: "tools" },
   ],
   nhttr: [
+    // Monthly equivalents of annual listing platform fees (see inventory-platforms-data.ts)
     { platform: "Google Ads (RV Repair)", budget: 2500, spent: 0, category: "advertising" },
     { platform: "Google Ads (TTR)", budget: 2500, spent: 0, category: "advertising" },
-    { platform: "NTTS Listing", budget: 350, spent: 350, category: "platform" },
-    { platform: "Find Truck Service", budget: 295, spent: 295, category: "platform" },
-    { platform: "TruckDown", budget: 195, spent: 195, category: "platform" },
-    { platform: "Go High Level", budget: 297, spent: 297, category: "tools" },
+    { platform: "NTTS Listing", budget: 8, spent: 8, category: "platform" }, // $100/yr
+    { platform: "Find Truck Service", budget: 83, spent: 83, category: "platform" }, // $996/yr
+    { platform: "TruckDown", budget: 36, spent: 36, category: "platform" }, // $430/yr
     { platform: "CallRail", budget: 145, spent: 145, category: "tools" },
   ],
   "road-ready": [

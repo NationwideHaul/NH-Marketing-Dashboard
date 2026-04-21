@@ -15,37 +15,55 @@ import { useDateRange } from "@/context/date-range-context";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { generateTimeSeries, aggregateMonthly, aggregateMonthlyAvg } from "@/lib/mock-data/generator";
 import { platformMetricConfigs } from "@/lib/mock-data/platform-configs";
+import { getPlatformsForAccount } from "@/lib/inventory-platforms-data";
 
-// NHTTR pulls real revenue from FullBay. Fetches a 12-month window and
-// returns { "MMM yy": dollars }. Returns null while loading or on error so
-// the caller can fall back to mock data without flashing empty values.
-function useFullbayMonthlyRevenue(accountId: string): Record<string, number> | null {
-  const [data, setData] = useState<Record<string, number> | null>(null);
+const BLANK = "—";
+
+/**
+ * NHTTR ad spend = real Google Ads spend for the active date range PLUS
+ * the account's inventory-platform monthly fees (annualCost / 12 for each
+ * annual platform). Returns null while loading so the card can display a
+ * blank until data arrives.
+ */
+function useNhttrAdSpend(
+  accountId: string,
+  startDate: string,
+  endDate: string,
+): { total: number; googleAds: number; inventoryMonthly: number } | null {
+  const [googleAds, setGoogleAds] = useState<number | null>(null);
   useEffect(() => {
-    if (!accountId.startsWith("nhttr")) { setData(null); return; }
+    if (!accountId.startsWith("nhttr")) { setGoogleAds(null); return; }
     let cancelled = false;
-    const end = new Date();
-    const start = subMonths(startOfMonth(end), 11);
-    const startStr = format(start, "yyyy-MM-dd");
-    const endStr = format(end, "yyyy-MM-dd");
-    fetch(`/api/fullbay?type=summary&startDate=${startStr}&endDate=${endStr}&accountId=${accountId}`)
+    fetch(`/api/google-ads?startDate=${startDate}&endDate=${endDate}&accountId=${accountId}`)
       .then((r) => r.json())
       .then((res) => {
-        if (cancelled || res.status !== "live" || !res.data?.timeSeries) return;
-        const byMonth: Record<string, number> = {};
-        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        for (const p of res.data.timeSeries as { date: string; value: number }[]) {
-          const yr = p.date.substring(2, 4);
-          const mo = parseInt(p.date.substring(5, 7), 10);
-          const label = `${monthNames[mo - 1]} ${yr}`;
-          byMonth[label] = (byMonth[label] || 0) + p.value;
+        if (cancelled || res.status !== "live") return;
+        const rows = Array.isArray(res.data) ? res.data.flatMap((r: { results?: unknown[] }) => r.results ?? []) : res.data?.results ?? [];
+        let totalMicros = 0;
+        for (const row of rows as { metrics?: { costMicros?: string } }[]) {
+          totalMicros += parseInt(row.metrics?.costMicros ?? "0", 10);
         }
-        setData(byMonth);
+        setGoogleAds(totalMicros / 1_000_000);
       })
-      .catch(() => { if (!cancelled) setData(null); });
+      .catch(() => { if (!cancelled) setGoogleAds(null); });
     return () => { cancelled = true; };
-  }, [accountId]);
-  return data;
+  }, [accountId, startDate, endDate]);
+
+  if (!accountId.startsWith("nhttr")) return null;
+
+  const platforms = getPlatformsForAccount("nhttr");
+  const inventoryMonthly = platforms.reduce((sum, p) => {
+    if (p.billingCycle === "annual" && p.annualCost) return sum + p.annualCost / 12;
+    if (p.billingCycle === "monthly") return sum + p.pricePerMonth;
+    return sum;
+  }, 0);
+
+  if (googleAds === null) return null;
+  return {
+    googleAds: Math.round(googleAds * 100) / 100,
+    inventoryMonthly: Math.round(inventoryMonthly * 100) / 100,
+    total: Math.round((googleAds + inventoryMonthly) * 100) / 100,
+  };
 }
 
 // ========== METRIC DEFINITIONS (for ? tooltips) ==========
@@ -298,7 +316,10 @@ export default function ROIMetricsPage() {
   const primary = currentAccount.colors.primary;
   const secondary = currentAccount.colors.secondary;
   const [expandedMetric, setExpandedMetric] = useState<string | null>(null);
-  const fullbayRevenue = useFullbayMonthlyRevenue(apiAccountId);
+  const isNHTTR = apiAccountId.startsWith("nhttr");
+  const nhttrSpendStartStr = format(subMonths(startOfMonth(new Date()), 11), "yyyy-MM-dd");
+  const nhttrSpendEndStr = format(new Date(), "yyyy-MM-dd");
+  const nhttrAdSpend = useNhttrAdSpend(apiAccountId, nhttrSpendStartStr, nhttrSpendEndStr);
 
   // Generate 12 months of data for all metrics
   const monthlyData = useMemo(() => {
@@ -347,18 +368,8 @@ export default function ROIMetricsPage() {
       result[`ga-${config.key}`] = monthly.map(toMonthLabel);
     }
 
-    // NHTTR: overlay FullBay real revenue onto the mock-generated series so
-    // the rest of the page (ROAS, MER, ROI, revenueGrowth) recomputes against
-    // real dollars. Months missing from FullBay keep the mock value.
-    if (fullbayRevenue && result.revenue) {
-      result.revenue = result.revenue.map((p) => ({
-        month: p.month,
-        value: fullbayRevenue[p.month] ?? p.value,
-      }));
-    }
-
     return result;
-  }, [dateRange.to, fullbayRevenue]);
+  }, [dateRange.to]);
 
   // Compute current period values (last month's data)
   const current = useMemo(() => {
@@ -498,71 +509,119 @@ export default function ROIMetricsPage() {
       <SectionHeader title="Overall Sales & Spend" />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <ROIStatCard
-          title="Total Revenue (Monthly)" value={formatCurrency(current.revenue)} metricKey="revenue"
-          trend={current.trends.revenue} changePercent={current.changes.revenue}
-          onClick={() => setExpandedMetric("revenue")} accent={primary}
+          title="Total Revenue (Monthly)"
+          value={isNHTTR ? BLANK : formatCurrency(current.revenue)}
+          metricKey="revenue"
+          trend={isNHTTR ? undefined : current.trends.revenue}
+          changePercent={isNHTTR ? undefined : current.changes.revenue}
+          onClick={isNHTTR ? undefined : () => setExpandedMetric("revenue")}
+          accent={primary}
+          subtitle={isNHTTR ? "No CRM connected" : undefined}
         />
         <ROIStatCard
-          title="Close Rate (Lead-to-Sale)" value={formatPercent(current.closeRate)} metricKey="closeRate"
-          trend={current.trends.closeRate} changePercent={current.changes.closeRate}
-          onClick={() => setExpandedMetric("closeRate")} accent={primary}
+          title="Close Rate (Lead-to-Sale)"
+          value={isNHTTR ? BLANK : formatPercent(current.closeRate)}
+          metricKey="closeRate"
+          trend={isNHTTR ? undefined : current.trends.closeRate}
+          changePercent={isNHTTR ? undefined : current.changes.closeRate}
+          onClick={isNHTTR ? undefined : () => setExpandedMetric("closeRate")}
+          accent={primary}
+          subtitle={isNHTTR ? "No CRM connected" : undefined}
         />
         <ROIStatCard
-          title="AOV (Avg. Order Value)" value={formatCurrency(current.aov)} metricKey="aov"
-          trend={current.trends.aov} changePercent={current.changes.aov}
-          onClick={() => setExpandedMetric("aov")} accent={primary}
+          title="AOV (Avg. Order Value)"
+          value={isNHTTR ? BLANK : formatCurrency(current.aov)}
+          metricKey="aov"
+          trend={isNHTTR ? undefined : current.trends.aov}
+          changePercent={isNHTTR ? undefined : current.changes.aov}
+          onClick={isNHTTR ? undefined : () => setExpandedMetric("aov")}
+          accent={primary}
+          subtitle={isNHTTR ? "No CRM connected" : undefined}
         />
         <ROIStatCard
-          title="New Customers" value={formatNumber(Math.round(current.newCustomers))} metricKey="cac"
-          subtitle="This month" trend={current.changes.newCustomers > 0.5 ? "up" : current.changes.newCustomers < -0.5 ? "down" : "flat"}
-          changePercent={current.changes.newCustomers}
-          onClick={() => setExpandedMetric("newCustomers")} accent={primary}
+          title="New Customers"
+          value={isNHTTR ? BLANK : formatNumber(Math.round(current.newCustomers))}
+          metricKey="cac"
+          subtitle={isNHTTR ? "No CRM connected" : "This month"}
+          trend={isNHTTR ? undefined : (current.changes.newCustomers > 0.5 ? "up" : current.changes.newCustomers < -0.5 ? "down" : "flat")}
+          changePercent={isNHTTR ? undefined : current.changes.newCustomers}
+          onClick={isNHTTR ? undefined : () => setExpandedMetric("newCustomers")}
+          accent={primary}
         />
       </div>
 
-      {/* Revenue Trend Chart */}
-      <div className="mt-3 rounded-lg border border-border bg-card p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <h4 className="text-sm font-semibold text-card-foreground">Revenue Trend (Monthly)</h4>
-          <InfoTooltip metricKey="revenue" />
+      {/* Revenue Trend Chart — hidden for NHTTR since revenue is not connected */}
+      {!isNHTTR && (
+        <div className="mt-3 rounded-lg border border-border bg-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <h4 className="text-sm font-semibold text-card-foreground">Revenue Trend (Monthly)</h4>
+            <InfoTooltip metricKey="revenue" />
+          </div>
+          <div className="h-52">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={monthlyData["revenue"] || []} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="month" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`} width={50} />
+                <Tooltip contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "12px" }}
+                  formatter={(v: number) => [formatCurrency(v), "Revenue"]} />
+                <Area type="monotone" dataKey="value" stroke={primary} fill={primary} fillOpacity={0.12} strokeWidth={2} dot={{ r: 2.5, fill: primary }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-        <div className="h-52">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={monthlyData["revenue"] || []} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="month" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`} width={50} />
-              <Tooltip contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "12px" }}
-                formatter={(v: number) => [formatCurrency(v), "Revenue"]} />
-              <Area type="monotone" dataKey="value" stroke={primary} fill={primary} fillOpacity={0.12} strokeWidth={2} dot={{ r: 2.5, fill: primary }} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      )}
 
       {/* ==================== TOP-LINE PROFITABILITY ==================== */}
       <SectionHeader title="Top-Line Profitability" />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <ROIStatCard
-          title="Total Ad Spend" value={formatCurrency(current.adSpend)} metricKey="adSpend"
-          trend={current.trends.adSpend} changePercent={current.changes.adSpend}
-          onClick={() => setExpandedMetric("adSpend")} accent={COLORS[1]}
-          subtitle="Click for breakdown"
+          title="Total Ad Spend"
+          value={
+            isNHTTR
+              ? (nhttrAdSpend ? formatCurrency(nhttrAdSpend.total) : BLANK)
+              : formatCurrency(current.adSpend)
+          }
+          metricKey="adSpend"
+          trend={isNHTTR ? undefined : current.trends.adSpend}
+          changePercent={isNHTTR ? undefined : current.changes.adSpend}
+          onClick={isNHTTR ? undefined : () => setExpandedMetric("adSpend")}
+          accent={COLORS[1]}
+          subtitle={
+            isNHTTR && nhttrAdSpend
+              ? `Google Ads ${formatCurrency(nhttrAdSpend.googleAds)} + Listings ${formatCurrency(nhttrAdSpend.inventoryMonthly)}/mo`
+              : "Click for breakdown"
+          }
         />
         <ROIStatCard
-          title="ROAS" value={`${current.roas.toFixed(1)}x`} metricKey="roas"
-          trend={current.trends.roas} changePercent={current.changes.roas}
-          onClick={() => setExpandedMetric("roas")} accent={COLORS[0]}
+          title="ROAS"
+          value={isNHTTR ? BLANK : `${current.roas.toFixed(1)}x`}
+          metricKey="roas"
+          trend={isNHTTR ? undefined : current.trends.roas}
+          changePercent={isNHTTR ? undefined : current.changes.roas}
+          onClick={isNHTTR ? undefined : () => setExpandedMetric("roas")}
+          accent={COLORS[0]}
+          subtitle={isNHTTR ? "Needs revenue source" : undefined}
         />
         <ROIStatCard
-          title="MER" value={`${current.mer.toFixed(1)}x`} metricKey="mer"
-          trend={current.trends.mer} changePercent={current.changes.mer}
-          onClick={() => setExpandedMetric("mer")} accent={COLORS[2]}
+          title="MER"
+          value={isNHTTR ? BLANK : `${current.mer.toFixed(1)}x`}
+          metricKey="mer"
+          trend={isNHTTR ? undefined : current.trends.mer}
+          changePercent={isNHTTR ? undefined : current.changes.mer}
+          onClick={isNHTTR ? undefined : () => setExpandedMetric("mer")}
+          accent={COLORS[2]}
+          subtitle={isNHTTR ? "Needs revenue source" : undefined}
         />
         <ROIStatCard
-          title="ROI" value={`${current.roiPct.toFixed(0)}%`} metricKey="roi"
-          trend={current.trends.roi} changePercent={current.changes.roi}
-          onClick={() => setExpandedMetric("roi")} accent={COLORS[3]}
+          title="ROI"
+          value={isNHTTR ? BLANK : `${current.roiPct.toFixed(0)}%`}
+          metricKey="roi"
+          trend={isNHTTR ? undefined : current.trends.roi}
+          changePercent={isNHTTR ? undefined : current.changes.roi}
+          onClick={isNHTTR ? undefined : () => setExpandedMetric("roi")}
+          accent={COLORS[3]}
+          subtitle={isNHTTR ? "Needs revenue source" : undefined}
         />
       </div>
 
@@ -570,86 +629,109 @@ export default function ROIMetricsPage() {
       <SectionHeader title="Efficiency" />
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <ROIStatCard
-          title="CAC (Acquisition Cost)" value={formatCurrency(current.cac)} metricKey="cac"
-          trend={current.trends.cac} changePercent={current.changes.cac}
-          onClick={() => setExpandedMetric("cac")} accent={COLORS[4] || primary}
+          title="CAC (Acquisition Cost)"
+          value={isNHTTR ? BLANK : formatCurrency(current.cac)}
+          metricKey="cac"
+          trend={isNHTTR ? undefined : current.trends.cac}
+          changePercent={isNHTTR ? undefined : current.changes.cac}
+          onClick={isNHTTR ? undefined : () => setExpandedMetric("cac")}
+          accent={COLORS[4] || primary}
+          subtitle={isNHTTR ? "No CRM connected" : undefined}
         />
         <ROIStatCard
-          title="LTV (Lifetime Value)" value={formatCurrency(current.ltv)} metricKey="ltv"
-          trend={current.trends.ltv} changePercent={current.changes.ltv}
-          onClick={() => setExpandedMetric("ltv")} accent={COLORS[5] || primary}
+          title="LTV (Lifetime Value)"
+          value={isNHTTR ? BLANK : formatCurrency(current.ltv)}
+          metricKey="ltv"
+          trend={isNHTTR ? undefined : current.trends.ltv}
+          changePercent={isNHTTR ? undefined : current.changes.ltv}
+          onClick={isNHTTR ? undefined : () => setExpandedMetric("ltv")}
+          accent={COLORS[5] || primary}
+          subtitle={isNHTTR ? "No CRM connected" : undefined}
         />
         <div className="rounded-lg border border-border bg-card p-4">
           <div className="flex items-center mb-1">
             <p className="text-xs text-muted-foreground">LTV:CAC Ratio</p>
             <InfoTooltip metricKey="ltvCacRatio" />
           </div>
-          <p className="text-2xl font-bold" style={{ color: current.ltvCacRatio >= 3 ? "#16A34A" : current.ltvCacRatio >= 2 ? "#D97706" : "#EF4444" }}>
-            {current.ltvCacRatio.toFixed(1)}:1
-          </p>
-          <div className="mt-1.5">
-            <span className={cn(
-              "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
-              current.ltvCacRatio >= 3 ? "bg-emerald-100 text-emerald-700" :
-              current.ltvCacRatio >= 2 ? "bg-amber-100 text-amber-700" :
-              "bg-red-100 text-red-700"
-            )}>
-              {current.ltvCacRatio >= 3 ? "Healthy" : current.ltvCacRatio >= 2 ? "Needs Improvement" : "Overspending"}
-            </span>
-            <p className="text-[10px] text-muted-foreground mt-1">Target: 3:1 or higher</p>
-          </div>
+          {isNHTTR ? (
+            <>
+              <p className="text-2xl font-bold text-muted-foreground">{BLANK}</p>
+              <p className="text-[10px] text-muted-foreground mt-1">No CRM connected</p>
+            </>
+          ) : (
+            <>
+              <p className="text-2xl font-bold" style={{ color: current.ltvCacRatio >= 3 ? "#16A34A" : current.ltvCacRatio >= 2 ? "#D97706" : "#EF4444" }}>
+                {current.ltvCacRatio.toFixed(1)}:1
+              </p>
+              <div className="mt-1.5">
+                <span className={cn(
+                  "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
+                  current.ltvCacRatio >= 3 ? "bg-emerald-100 text-emerald-700" :
+                  current.ltvCacRatio >= 2 ? "bg-amber-100 text-amber-700" :
+                  "bg-red-100 text-red-700"
+                )}>
+                  {current.ltvCacRatio >= 3 ? "Healthy" : current.ltvCacRatio >= 2 ? "Needs Improvement" : "Overspending"}
+                </span>
+                <p className="text-[10px] text-muted-foreground mt-1">Target: 3:1 or higher</p>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       {/* ==================== PERFORMANCE TREND ==================== */}
-      <SectionHeader title="Performance Trend" />
+      {!isNHTTR && (
+        <>
+          <SectionHeader title="Performance Trend" />
+          {/* Ad Spend vs Revenue Overlap */}
+          <div className="rounded-lg border border-border bg-card p-4 mb-3">
+            <div className="flex items-center gap-2 mb-3">
+              <h4 className="text-sm font-semibold text-card-foreground">Ad Spend vs. Revenue</h4>
+              <InfoTooltip metricKey="roas" />
+            </div>
+            <div className="h-60">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={overlapData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} />
+                  <YAxis yAxisId="revenue" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false}
+                    tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`} width={55} />
+                  <YAxis yAxisId="spend" orientation="right" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false}
+                    tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`} width={55} />
+                  <Tooltip contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "12px" }}
+                    formatter={(v: number, name: string) => [formatCurrency(v), name === "revenue" ? "Revenue" : "Ad Spend"]} />
+                  <Legend />
+                  <Area yAxisId="revenue" type="monotone" dataKey="revenue" name="Revenue" stroke={primary} fill={primary} fillOpacity={0.1} strokeWidth={2} />
+                  <Bar yAxisId="spend" dataKey="adSpend" name="Ad Spend" fill={COLORS[1]} fillOpacity={0.7} radius={[2, 2, 0, 0]} barSize={20} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
 
-      {/* Ad Spend vs Revenue Overlap */}
-      <div className="rounded-lg border border-border bg-card p-4 mb-3">
-        <div className="flex items-center gap-2 mb-3">
-          <h4 className="text-sm font-semibold text-card-foreground">Ad Spend vs. Revenue</h4>
-          <InfoTooltip metricKey="roas" />
-        </div>
-        <div className="h-60">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={overlapData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="month" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false} />
-              <YAxis yAxisId="revenue" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false}
-                tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`} width={55} />
-              <YAxis yAxisId="spend" orientation="right" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickLine={false} axisLine={false}
-                tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`} width={55} />
-              <Tooltip contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px", fontSize: "12px" }}
-                formatter={(v: number, name: string) => [formatCurrency(v), name === "revenue" ? "Revenue" : "Ad Spend"]} />
-              <Legend />
-              <Area yAxisId="revenue" type="monotone" dataKey="revenue" name="Revenue" stroke={primary} fill={primary} fillOpacity={0.1} strokeWidth={2} />
-              <Bar yAxisId="spend" dataKey="adSpend" name="Ad Spend" fill={COLORS[1]} fillOpacity={0.7} radius={[2, 2, 0, 0]} barSize={20} />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Top Channels */}
-      <div className="rounded-lg border border-border bg-card p-4">
-        <h4 className="text-sm font-semibold text-card-foreground mb-3">Top Channels by Revenue Contribution</h4>
-        <div className="space-y-2.5">
-          {channelData.map((ch) => {
-            const maxVal = Math.max(...channelData.map((c) => c.value));
-            const pct = maxVal > 0 ? (ch.value / maxVal) * 100 : 0;
-            return (
-              <div key={ch.channel} className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground w-32 shrink-0 truncate">{ch.channel}</span>
-                <div className="flex-1 h-5 bg-muted/30 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: ch.fill }} />
-                </div>
-                <span className="text-xs font-medium w-16 text-right">{formatCurrency(ch.value)}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+          {/* Top Channels */}
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h4 className="text-sm font-semibold text-card-foreground mb-3">Top Channels by Revenue Contribution</h4>
+            <div className="space-y-2.5">
+              {channelData.map((ch) => {
+                const maxVal = Math.max(...channelData.map((c) => c.value));
+                const pct = maxVal > 0 ? (ch.value / maxVal) * 100 : 0;
+                return (
+                  <div key={ch.channel} className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground w-32 shrink-0 truncate">{ch.channel}</span>
+                    <div className="flex-1 h-5 bg-muted/30 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: ch.fill }} />
+                    </div>
+                    <span className="text-xs font-medium w-16 text-right">{formatCurrency(ch.value)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ==================== CONVERSION FUNNEL ==================== */}
+      {!isNHTTR && <>
       <SectionHeader title="Conversion Funnel" metricKey="funnel" />
       <div className="rounded-lg border border-border bg-card p-5">
         {/* Header row */}
@@ -691,34 +773,40 @@ export default function ROIMetricsPage() {
         </div>
       </div>
 
+      </>}
+
       {/* ==================== KEY METRICS SUMMARY ==================== */}
-      <SectionHeader title="Key Metrics Summary" />
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <ROIStatCard
-          title="Traffic Growth" value={formatPercent(current.raw.trafficGrowth)} metricKey="trafficGrowth"
-          trend={current.changes.trafficGrowth > 0.5 ? "up" : current.changes.trafficGrowth < -0.5 ? "down" : "flat"}
-          changePercent={current.changes.trafficGrowth}
-          onClick={() => setExpandedMetric("trafficGrowth")} accent="#2563EB"
-        />
-        <ROIStatCard
-          title="Revenue Growth" value={formatPercent(current.raw.revenueGrowth)} metricKey="revenueGrowth"
-          trend={current.changes.revenueGrowth > 0.5 ? "up" : current.changes.revenueGrowth < -0.5 ? "down" : "flat"}
-          changePercent={current.changes.revenueGrowth}
-          onClick={() => setExpandedMetric("revenueGrowth")} accent="#16A34A"
-        />
-        <ROIStatCard
-          title="Cost Efficiency" value={formatPercent(current.raw.costEfficiency)} metricKey="costEfficiency"
-          trend={current.changes.costEfficiency > 0.5 ? "up" : current.changes.costEfficiency < -0.5 ? "down" : "flat"}
-          changePercent={current.changes.costEfficiency}
-          onClick={() => setExpandedMetric("costEfficiency")} accent="#D97706"
-        />
-        <ROIStatCard
-          title="Profit Margin" value={formatPercent(current.raw.profitMargin)} metricKey="profitMargin"
-          trend={current.changes.profitMargin > 0.5 ? "up" : current.changes.profitMargin < -0.5 ? "down" : "flat"}
-          changePercent={current.changes.profitMargin}
-          onClick={() => setExpandedMetric("profitMargin")} accent="#8B5CF6"
-        />
-      </div>
+      {!isNHTTR && (
+        <>
+          <SectionHeader title="Key Metrics Summary" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <ROIStatCard
+              title="Traffic Growth" value={formatPercent(current.raw.trafficGrowth)} metricKey="trafficGrowth"
+              trend={current.changes.trafficGrowth > 0.5 ? "up" : current.changes.trafficGrowth < -0.5 ? "down" : "flat"}
+              changePercent={current.changes.trafficGrowth}
+              onClick={() => setExpandedMetric("trafficGrowth")} accent="#2563EB"
+            />
+            <ROIStatCard
+              title="Revenue Growth" value={formatPercent(current.raw.revenueGrowth)} metricKey="revenueGrowth"
+              trend={current.changes.revenueGrowth > 0.5 ? "up" : current.changes.revenueGrowth < -0.5 ? "down" : "flat"}
+              changePercent={current.changes.revenueGrowth}
+              onClick={() => setExpandedMetric("revenueGrowth")} accent="#16A34A"
+            />
+            <ROIStatCard
+              title="Cost Efficiency" value={formatPercent(current.raw.costEfficiency)} metricKey="costEfficiency"
+              trend={current.changes.costEfficiency > 0.5 ? "up" : current.changes.costEfficiency < -0.5 ? "down" : "flat"}
+              changePercent={current.changes.costEfficiency}
+              onClick={() => setExpandedMetric("costEfficiency")} accent="#D97706"
+            />
+            <ROIStatCard
+              title="Profit Margin" value={formatPercent(current.raw.profitMargin)} metricKey="profitMargin"
+              trend={current.changes.profitMargin > 0.5 ? "up" : current.changes.profitMargin < -0.5 ? "down" : "flat"}
+              changePercent={current.changes.profitMargin}
+              onClick={() => setExpandedMetric("profitMargin")} accent="#8B5CF6"
+            />
+          </div>
+        </>
+      )}
 
       {/* ========== CHART MODAL (expanded metric) ========== */}
       {expandedMetric && monthlyData[expandedMetric] && (
