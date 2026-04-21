@@ -56,6 +56,9 @@ const STATIC_CREDENTIALS: Record<string, StaticAccountCredentials> = {
     ghlLocationId: "IEs4Gwg925sPu0AYNpdS",
     ghlApiKeyEnvSuffix: "NATIONWIDE_HAUL",
     youtubeChannelId: "UCjWMfLksDwfwVA-u3xkhnhg",
+    metaAdAccountId: "act_233729070644721",
+    metaPageId: "183569358434902",
+    metaIgUserId: "17841401172603723",
     ringcentralEnabled: true,
   },
   "nfi-truck-sales": {
@@ -152,8 +155,16 @@ async function resolveGlobalEnv(envVar: string): Promise<string | undefined> {
 
 /**
  * Resolves a field that has BOTH a per-account KV path and a global env var
- * fallback. Examples: metaAccessToken, ghlLocationId (when env GHL_LOCATION_ID
- * is set for NH).
+ * fallback.
+ *
+ * Resolution order:
+ *   1. KV per-account override  — user-edited value in Settings UI
+ *   2. Hardcoded per-account value (staticCreds) — explicit per-account default
+ *   3. Global env var (e.g. META_AD_ACCOUNT_ID)
+ *
+ * NOTE: per-account static wins over global env. A global env var like
+ * META_AD_ACCOUNT_ID must NOT leak NH's ad account into Road Ready or any
+ * other sub-account that has its own baked-in value.
  */
 async function resolveBoth(
   accountId: string,
@@ -161,13 +172,11 @@ async function resolveBoth(
   globalEnvVar: string,
   hardcodedFallback?: string
 ): Promise<string | undefined> {
-  // KV per-account first
   const perAcct = await getAccountCredential(accountId, field as string);
   if (perAcct.source !== "missing") return perAcct.value;
-  // Global KV → process.env
+  if (hardcodedFallback && hardcodedFallback.trim()) return hardcodedFallback.trim();
   const globalVal = await resolveGlobalEnv(globalEnvVar);
-  if (globalVal) return globalVal;
-  return hardcodedFallback && hardcodedFallback.trim() ? hardcodedFallback.trim() : undefined;
+  return globalVal || undefined;
 }
 
 export async function getAccountCredentials(
@@ -243,6 +252,9 @@ export function getAccountCredentialsSync(accountId: string): AccountCredentials
   const ghlKeyFromPerAcctEnv = staticCreds.ghlApiKeyEnvSuffix
     ? trimEnv(`GHL_API_KEY_${staticCreds.ghlApiKeyEnvSuffix}`)
     : "";
+  // Per-account static wins over global env — a global env var (e.g.
+  // META_AD_ACCOUNT_ID set to NH's ID) must not leak into other sub-accounts
+  // that already have their own baked-in value.
   return {
     ga4PropertyId: staticCreds.ga4PropertyId,
     googleAdsCustomerId: staticCreds.googleAdsCustomerId,
@@ -251,10 +263,10 @@ export function getAccountCredentialsSync(accountId: string): AccountCredentials
     callrailCompanyId: staticCreds.callrailCompanyId,
     ghlLocationId: staticCreds.ghlLocationId || trimEnv("GHL_LOCATION_ID") || undefined,
     ghlApiKey: ghlKeyFromPerAcctEnv || trimEnv("GHL_API_KEY") || undefined,
-    metaAdAccountId: trimEnv("META_AD_ACCOUNT_ID") || staticCreds.metaAdAccountId,
+    metaAdAccountId: staticCreds.metaAdAccountId || trimEnv("META_AD_ACCOUNT_ID") || undefined,
     metaAccessToken: trimEnv("META_ACCESS_TOKEN") || undefined,
-    metaPageId: trimEnv("META_PAGE_ID") || undefined,
-    metaIgUserId: trimEnv("META_IG_USER_ID") || undefined,
+    metaPageId: staticCreds.metaPageId || trimEnv("META_PAGE_ID") || undefined,
+    metaIgUserId: staticCreds.metaIgUserId || trimEnv("META_IG_USER_ID") || undefined,
     youtubeChannelId: staticCreds.youtubeChannelId,
     ringcentralEnabled: staticCreds.ringcentralEnabled,
     gmbLocations: staticCreds.gmbLocations,

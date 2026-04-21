@@ -120,25 +120,14 @@ export const connections: ConnectionDef[] = [
     ],
   },
   {
-    id: "nh-crm",
-    name: "Nationwide Haul CRM",
-    description: "Internal CRM feed for service leads and sales.",
-    category: "crm",
-    icon: "Database",
-    credentials: [
-      { label: "API Key", envVar: "NH_CRM_API_KEY", secret: true },
-    ],
-  },
-  {
     id: "linkedin",
-    name: "LinkedIn",
-    description: "Organization page analytics.",
+    name: "LinkedIn (OAuth App)",
+    description: "Shared LinkedIn app access token — org IDs live per-account.",
     category: "social",
     icon: "Linkedin",
     docsUrl: "https://www.linkedin.com/developers/apps",
     credentials: [
       { label: "Access Token", envVar: "LINKEDIN_ACCESS_TOKEN", secret: true },
-      { label: "Organization ID", envVar: "LINKEDIN_ORGANIZATION_ID", secret: false },
     ],
   },
 ];
@@ -173,6 +162,12 @@ export interface PerAccountConnectionDef {
   icon: string;
   docsUrl?: string;
   fields: PerAccountField[];
+  /**
+   * If set, this card only shows for the listed account IDs (e.g. Meta only
+   * for accounts that actually run Meta ads). Undefined = show for every
+   * account. Matches both parent IDs and sub-service IDs (e.g. "nhttr-rv").
+   */
+  accountIds?: string[];
 }
 
 /** Maps dashboard account IDs to the env-var suffix used for GHL keys. */
@@ -180,6 +175,13 @@ const GHL_KEY_SUFFIX: Record<string, string> = {
   "nationwide-haul": "NATIONWIDE_HAUL",
   "nfi-truck-sales": "NFI",
   "road-ready": "ROAD_READY",
+};
+
+/** Maps dashboard account IDs to the env-var for the account's CRM API key. */
+const CRM_API_KEY_ENV: Record<string, string> = {
+  "nationwide-haul": "NH_CRM_API_KEY",
+  "nfi-truck-sales": "NH_CRM_API_KEY",
+  "road-ready": "RRI_CRM_API_KEY",
 };
 
 export const perAccountConnections: PerAccountConnectionDef[] = [
@@ -202,6 +204,7 @@ export const perAccountConnections: PerAccountConnectionDef[] = [
     fields: [
       { field: "googleAdsCustomerId", label: "Customer ID", secret: false },
     ],
+    accountIds: ["nationwide-haul", "nfi-truck-sales", "nhttr", "road-ready"],
   },
   {
     id: "callrail-company",
@@ -216,8 +219,8 @@ export const perAccountConnections: PerAccountConnectionDef[] = [
   },
   {
     id: "meta-per-account",
-    name: "Meta Ad Account",
-    description: "Facebook/Instagram Ad Account, Page, and IG User for this business.",
+    name: "Meta (Facebook & Instagram)",
+    description: "Ad Account, Facebook Page and Instagram user IDs for this business.",
     category: "ads",
     icon: "Megaphone",
     fields: [
@@ -225,6 +228,8 @@ export const perAccountConnections: PerAccountConnectionDef[] = [
       { field: "metaPageId", label: "Facebook Page ID", secret: false },
       { field: "metaIgUserId", label: "Instagram User ID", secret: false },
     ],
+    // Meta ads/social only for the brands that run Meta.
+    accountIds: ["nationwide-haul", "road-ready"],
   },
   {
     id: "ghl-location",
@@ -244,6 +249,7 @@ export const perAccountConnections: PerAccountConnectionDef[] = [
         },
       },
     ],
+    accountIds: ["nationwide-haul", "nfi-truck-sales", "road-ready"],
   },
   {
     id: "youtube-channel",
@@ -254,6 +260,41 @@ export const perAccountConnections: PerAccountConnectionDef[] = [
     fields: [
       { field: "youtubeChannelId", label: "Channel ID", secret: false },
     ],
+    // NH is the only brand with a YouTube channel right now.
+    accountIds: ["nationwide-haul"],
+  },
+  {
+    id: "linkedin-org",
+    name: "LinkedIn Organization",
+    description: "LinkedIn company page organization ID for this account.",
+    category: "social",
+    icon: "Linkedin",
+    fields: [
+      {
+        field: "linkedinOrganizationId",
+        label: "Organization ID",
+        secret: false,
+        fallbackEnvVar: () => "LINKEDIN_ORGANIZATION_ID",
+      },
+    ],
+    accountIds: ["nationwide-haul", "road-ready"],
+  },
+  {
+    id: "crm",
+    name: "CRM",
+    description: "Sales/service CRM feed for this account. Each brand uses a different CRM.",
+    category: "crm",
+    icon: "Database",
+    fields: [
+      {
+        field: "crmApiKey",
+        label: "API Key",
+        secret: true,
+        fallbackEnvVar: (accountId) => CRM_API_KEY_ENV[accountId],
+      },
+    ],
+    // NHTTR uses FullBay (separate integration), so no CRM here.
+    accountIds: ["nationwide-haul", "nfi-truck-sales", "road-ready"],
   },
 ];
 
@@ -416,8 +457,12 @@ function accountConfigValue(accountId: string, field: string): string {
 export async function getPerAccountConnectionStatuses(
   accountId: string
 ): Promise<PerAccountConnectionStatus[]> {
+  const parentId = accountId.replace(/-(rv|ttr)$/, "");
+  const applicable = perAccountConnections.filter(
+    (c) => !c.accountIds || c.accountIds.includes(accountId) || c.accountIds.includes(parentId),
+  );
   return Promise.all(
-    perAccountConnections.map(async (conn) => {
+    applicable.map(async (conn) => {
       const fieldStatuses: PerAccountFieldStatus[] = await Promise.all(
         conn.fields.map(async (f) => {
           const fallbackEnvVar = f.fallbackEnvVar?.(accountId);
