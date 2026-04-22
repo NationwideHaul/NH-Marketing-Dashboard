@@ -334,8 +334,8 @@ export default function ROIMetricsPage() {
   const secondary = currentAccount.colors.secondary;
   const [expandedMetric, setExpandedMetric] = useState<string | null>(null);
   const isNHTTR = apiAccountId.startsWith("nhttr");
-  const nhttrSpendStartStr = format(subMonths(startOfMonth(new Date()), 11), "yyyy-MM-dd");
-  const nhttrSpendEndStr = format(new Date(), "yyyy-MM-dd");
+  const nhttrSpendStartStr = format(dateRange.from, "yyyy-MM-dd");
+  const nhttrSpendEndStr = format(dateRange.to, "yyyy-MM-dd");
   const nhttrAdSpend = useNhttrAdSpend(apiAccountId, nhttrSpendStartStr, nhttrSpendEndStr);
 
   // Generate 12 months of data for all metrics
