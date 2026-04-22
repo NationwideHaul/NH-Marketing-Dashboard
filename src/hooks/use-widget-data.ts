@@ -1,11 +1,40 @@
 "use client";
 
 import useSWR from "swr";
+import { useState, useEffect } from "react";
 import { useDateRange } from "@/context/date-range-context";
 import { useAccount } from "@/context/account-context";
-import { format, differenceInDays, subDays } from "date-fns";
+import { format, differenceInDays, subDays, eachMonthOfInterval } from "date-fns";
 import type { WidgetConfig } from "@/types/widget";
 import type { KPIMetric } from "@/types/kpi";
+
+// Reads the per-month email logs the user enters on the Email Marketing tab
+// (stored in localStorage as `nh-email-logs-<accountId>`) and sums the chosen
+// metric across every month that falls inside `from..to`. Returns 0 when the
+// user hasn't filled in any logs yet.
+function sumEmailLogsMetric(
+  accountId: string,
+  metric: string,
+  from: Date,
+  to: Date,
+): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const raw = localStorage.getItem(`nh-email-logs-${accountId}`);
+    if (!raw) return 0;
+    const logs = JSON.parse(raw) as Record<string, Record<string, number>>;
+    const months = eachMonthOfInterval({ start: from, end: to });
+    let total = 0;
+    for (const m of months) {
+      const key = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`;
+      const entry = logs[key];
+      if (entry && typeof entry[metric] === "number") total += entry[metric];
+    }
+    return total;
+  } catch {
+    return 0;
+  }
+}
 
 // Map widget dataSource to API route
 function getApiRoute(dataSource: string): string {
@@ -43,7 +72,7 @@ const SWR_CONFIG = {
 // Main hook — fetches from real API and extracts metric, with previous period comparison
 export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
   const { dateRange } = useDateRange();
-  const { apiAccountId } = useAccount();
+  const { apiAccountId, currentAccount } = useAccount();
   const startDate = format(dateRange.from, "yyyy-MM-dd");
   const endDate = format(dateRange.to, "yyyy-MM-dd");
   const route = getApiRoute(config.dataSource);
@@ -56,12 +85,42 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
   const prevStart = subDays(prevEnd, days - 1);
   const prevUrl = `${route}${sep}startDate=${format(prevStart, "yyyy-MM-dd")}&endDate=${format(prevEnd, "yyyy-MM-dd")}&accountId=${apiAccountId}`;
 
-  const { data } = useSWR(url, fetcher, SWR_CONFIG);
+  // SWR keys are null for email-logs so no network request fires. Hooks still
+  // run unconditionally to keep React's hook ordering stable.
+  const isEmailLogs = config.dataSource === "email-logs";
+  const { data } = useSWR(isEmailLogs ? null : url, fetcher, SWR_CONFIG);
   const { data: prevData } = useSWR(
-    config.comparisonEnabled ? prevUrl : null,
+    !isEmailLogs && config.comparisonEnabled ? prevUrl : null,
     fetcher,
     SWR_CONFIG
   );
+
+  // Email-logs reads from localStorage and re-renders on storage events so
+  // edits made on the Email Marketing tab flow into Overview widgets.
+  const [logsTick, setLogsTick] = useState(0);
+  useEffect(() => {
+    if (!isEmailLogs) return;
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === `nh-email-logs-${currentAccount.id}`) setLogsTick((t) => t + 1);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [isEmailLogs, currentAccount.id]);
+
+  if (isEmailLogs) {
+    void logsTick; // force recomputation when storage changes
+    const value = sumEmailLogsMetric(currentAccount.id, config.metric, dateRange.from, dateRange.to);
+    let trend: "up" | "down" | "flat" = "flat";
+    let changePercent = 0;
+    if (config.comparisonEnabled) {
+      const prev = sumEmailLogsMetric(currentAccount.id, config.metric, prevStart, prevEnd);
+      if (prev !== 0) {
+        changePercent = ((value - prev) / prev) * 100;
+        trend = changePercent > 0 ? "up" : changePercent < 0 ? "down" : "flat";
+      }
+    }
+    return { id: config.metric, label: config.title, value, format: config.format, trend, changePercent };
+  }
 
   if (!data || data.status === "error") return null;
 

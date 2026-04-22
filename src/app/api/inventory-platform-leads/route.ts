@@ -52,10 +52,22 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    const debug = searchParams.get("debug") === "1";
+    const typesSeen: Record<string, number> = {};
+    const sourcesSeen: Record<string, number> = {};
+
     const apiResults = await Promise.all(
       monthRanges.map(async ({ start, end, monthLabel, monthKey }) => {
         try {
           const data = await getCRMSummary(start, end);
+          if (debug) {
+            for (const [t, c] of Object.entries(data.leads.byType || {})) {
+              typesSeen[t] = (typesSeen[t] || 0) + c;
+            }
+            for (const [s, c] of Object.entries(data.leads.bySource || {})) {
+              sourcesSeen[s] = (sourcesSeen[s] || 0) + c;
+            }
+          }
           const byPlatform: Record<string, number> = {};
           for (const [source, count] of Object.entries(data.leads.bySource)) {
             const platform = SOURCE_TO_PLATFORM[source];
@@ -68,7 +80,11 @@ export async function GET(request: NextRequest) {
       }),
     );
 
-    return NextResponse.json({ status: "live", data: apiResults });
+    return NextResponse.json({
+      status: "live",
+      data: apiResults,
+      ...(debug ? { debug: { typesSeen, sourcesSeen } } : {}),
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("Inventory platform leads error:", message);

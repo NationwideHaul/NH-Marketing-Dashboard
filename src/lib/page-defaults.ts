@@ -316,10 +316,13 @@ export const linkedinDefaults: PageDefault = {
 export const nfiOverviewDefaults: PageDefault = {
   widgets: [
     // Row 1: Website & Email stats
+    // Email metrics mirror what the user enters on the Email Marketing tab
+    // (localStorage "nh-email-logs-<accountId>"), summed across the selected
+    // date range's months. Values update live when the user edits the tab.
     { id: "nfi-1", type: "stat", title: "Website Total Visitors", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true },
-    { id: "nfi-2", type: "stat", title: "Email Campaign Opens (GHL)", dataSource: "email-marketing", metric: "emailsSent", format: "number", comparisonEnabled: true },
-    { id: "nfi-3", type: "stat", title: "Email Campaign Clicks (GHL)", dataSource: "email-marketing", metric: "newContacts", format: "number", comparisonEnabled: true },
-    { id: "nfi-3b", type: "manual-stat", title: "Email Campaign Replied (GHL)", dataSource: "email-marketing", metric: "replied", format: "number", manualValue: 0 },
+    { id: "nfi-2", type: "stat", title: "Email Campaign Opens", dataSource: "email-logs", metric: "opened", format: "number", comparisonEnabled: true },
+    { id: "nfi-3", type: "stat", title: "Email Campaign Clicks", dataSource: "email-logs", metric: "clicked", format: "number", comparisonEnabled: true },
+    { id: "nfi-3b", type: "stat", title: "Email Campaign Replied", dataSource: "email-logs", metric: "replied", format: "number", comparisonEnabled: true },
     // Row 2: PPC stats
     { id: "nfi-4", type: "stat", title: "Paid Search Traffic (PPC)", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true, dimension: "sessionDefaultChannelGroup" },
     { id: "nfi-5", type: "stat", title: "PPC Total Clicks", dataSource: "google-ads", metric: "clicks", format: "number", comparisonEnabled: true },
@@ -328,7 +331,9 @@ export const nfiOverviewDefaults: PageDefault = {
     // Row 3: Calls & Truck Paper
     { id: "nfi-8", type: "stat", title: "Total Phone Calls (CallRail)", dataSource: "callrail", metric: "totalCalls", format: "number", comparisonEnabled: true },
     { id: "nfi-9", type: "stat", title: "Truck Paper Phone Calls", dataSource: "callrail", metric: "totalCalls", format: "number", comparisonEnabled: true, tracker: "Truck Paper" },
-    { id: "nfi-10", type: "stat", title: "Truck Paper Info Submits", dataSource: "google-analytics", metric: "conversions", format: "number", comparisonEnabled: true },
+    // Info submits + banner clicks are manually tracked until the NFI-tagged
+    // CRM pipeline is wired up. Hover the card and click the pencil to edit.
+    { id: "nfi-10", type: "manual-stat", title: "Truck Paper Info Submits", dataSource: "overview", metric: "truckPaperInfoSubmits", format: "number", manualValue: 0 },
     { id: "nfi-12", type: "manual-stat", title: "Banner Ad Clicks (Truck Paper)", dataSource: "overview", metric: "bannerClicks", format: "number", manualValue: 0 },
     // Section: Trends Over Time
     { id: "nfi-sec", type: "section-header", title: "Trends Over Time", dataSource: "overview", metric: "none", format: "number", sectionTitle: "Trends Over Time" },

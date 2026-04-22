@@ -1,6 +1,6 @@
 import type { DashboardConfig } from "@/types/widget";
 
-const PREFIX = "nh-dash-v3-";
+const PREFIX = "nh-dash-v4-";
 
 export function saveDashboard(pageKey: string, config: DashboardConfig): void {
   if (typeof window === "undefined") return;

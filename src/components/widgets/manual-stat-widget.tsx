@@ -55,19 +55,19 @@ export function ManualStatWidget({ config }: { config: WidgetConfig }) {
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-2 group">
+          <div className="flex items-center gap-2">
             <p className="text-3xl font-bold text-foreground">{formatNumber(value)}</p>
             <button
               onClick={handleStartEdit}
-              className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-muted transition-all"
+              className="p-1 rounded hover:bg-muted transition-all"
               title="Edit value"
             >
-              <Pencil className="h-3 w-3 text-muted-foreground" />
+              <Pencil className="h-3.5 w-3.5 text-primary" />
             </button>
           </div>
         )}
       </div>
-      <p className="text-[11px] text-muted-foreground/50">Manually tracked</p>
+      <p className="text-[11px] text-primary/60 font-medium">Click pencil to edit</p>
     </div>
   );
 }
