@@ -483,20 +483,6 @@ export default function ROIMetricsPage() {
   }, [monthlyData]);
 
   // Top channels data
-  const channelData = useMemo(() => {
-    const gadsSpend = monthlyData["google-ads-spend"];
-    const metaSpend = monthlyData["meta-ads-spend"];
-    const gaTraffic = monthlyData["ga-sessions"];
-    const last = (arr: { value: number }[]) => arr && arr.length > 0 ? arr[arr.length - 1].value : 0;
-    return [
-      { channel: "Google Ads", value: last(gadsSpend), fill: COLORS[0] },
-      { channel: "Meta Ads", value: last(metaSpend), fill: COLORS[1] },
-      { channel: "Inventory Platforms", value: Math.round(last(gaTraffic) * 0.3), fill: COLORS[2] },
-      { channel: "NH Website (Organic)", value: Math.round(last(gaTraffic) * 0.45), fill: COLORS[3] },
-      { channel: "Other", value: Math.round(last(gaTraffic) * 0.08), fill: COLORS[4] },
-    ];
-  }, [monthlyData, COLORS]);
-
   // Conversion funnel data
   const funnelData = useMemo(() => {
     return [
@@ -725,25 +711,6 @@ export default function ROIMetricsPage() {
             </div>
           </div>
 
-          {/* Top Channels */}
-          <div className="rounded-lg border border-border bg-card p-4">
-            <h4 className="text-sm font-semibold text-card-foreground mb-3">Top Channels by Revenue Contribution</h4>
-            <div className="space-y-2.5">
-              {channelData.map((ch) => {
-                const maxVal = Math.max(...channelData.map((c) => c.value));
-                const pct = maxVal > 0 ? (ch.value / maxVal) * 100 : 0;
-                return (
-                  <div key={ch.channel} className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground w-32 shrink-0 truncate">{ch.channel}</span>
-                    <div className="flex-1 h-5 bg-muted/30 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: ch.fill }} />
-                    </div>
-                    <span className="text-xs font-medium w-16 text-right">{formatCurrency(ch.value)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
         </>
       )}
 
