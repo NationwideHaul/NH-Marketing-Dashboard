@@ -36,8 +36,9 @@ export default function LoginPage() {
           <Image
             src="/nh-logo-black.png"
             alt="Nationwide Haul"
-            width={48}
-            height={48}
+            width={220}
+            height={89}
+            priority
           />
           <h1 className="text-lg font-bold text-foreground">
             NH Marketing Dashboard
