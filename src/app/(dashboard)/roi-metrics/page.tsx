@@ -25,44 +25,61 @@ const BLANK = "—";
  * annual platform). Returns null while loading so the card can display a
  * blank until data arrives.
  */
+// NHTTR has two separate Google Ads customer IDs (RV & Bus Repair and
+// Truck & Trailer Repair) plus annually-billed listing platforms. ROI here
+// reflects NHTTR as a whole, so we fetch BOTH Google Ads accounts and
+// pro-rate the annual listings to the selected date range.
 function useNhttrAdSpend(
   accountId: string,
   startDate: string,
   endDate: string,
-): { total: number; googleAds: number; inventoryMonthly: number } | null {
+): { total: number; googleAds: number; inventoryPeriod: number } | null {
   const [googleAds, setGoogleAds] = useState<number | null>(null);
   useEffect(() => {
     if (!accountId.startsWith("nhttr")) { setGoogleAds(null); return; }
     let cancelled = false;
-    fetch(`/api/google-ads?startDate=${startDate}&endDate=${endDate}&accountId=${accountId}`)
-      .then((r) => r.json())
-      .then((res) => {
-        if (cancelled || res.status !== "live") return;
-        const rows = Array.isArray(res.data) ? res.data.flatMap((r: { results?: unknown[] }) => r.results ?? []) : res.data?.results ?? [];
-        let totalMicros = 0;
-        for (const row of rows as { metrics?: { costMicros?: string } }[]) {
-          totalMicros += parseInt(row.metrics?.costMicros ?? "0", 10);
-        }
-        setGoogleAds(totalMicros / 1_000_000);
-      })
+
+    const fetchSpend = async (acctId: string) => {
+      const r = await fetch(`/api/google-ads?startDate=${startDate}&endDate=${endDate}&accountId=${acctId}`);
+      const res = await r.json();
+      if (res.status !== "live") return 0;
+      const rows = Array.isArray(res.data)
+        ? res.data.flatMap((r: { results?: unknown[] }) => r.results ?? [])
+        : res.data?.results ?? [];
+      let totalMicros = 0;
+      for (const row of rows as { metrics?: { costMicros?: string } }[]) {
+        totalMicros += parseInt(row.metrics?.costMicros ?? "0", 10);
+      }
+      return totalMicros / 1_000_000;
+    };
+
+    Promise.all([fetchSpend("nhttr-rv"), fetchSpend("nhttr-ttr")])
+      .then(([rv, ttr]) => { if (!cancelled) setGoogleAds(rv + ttr); })
       .catch(() => { if (!cancelled) setGoogleAds(null); });
+
     return () => { cancelled = true; };
-  }, [accountId, startDate, endDate]);
+  }, [startDate, endDate, accountId]);
 
   if (!accountId.startsWith("nhttr")) return null;
 
   const platforms = getPlatformsForAccount("nhttr");
-  const inventoryMonthly = platforms.reduce((sum, p) => {
-    if (p.billingCycle === "annual" && p.annualCost) return sum + p.annualCost / 12;
-    if (p.billingCycle === "monthly") return sum + p.pricePerMonth;
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  const days = Math.max(
+    1,
+    Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1,
+  );
+  const inventoryPeriod = platforms.reduce((sum, p) => {
+    if (p.billingCycle === "annual" && p.annualCost) return sum + (p.annualCost / 365) * days;
+    if (p.billingCycle === "monthly") return sum + p.pricePerMonth * (days / 30);
     return sum;
   }, 0);
 
   if (googleAds === null) return null;
   return {
     googleAds: Math.round(googleAds * 100) / 100,
-    inventoryMonthly: Math.round(inventoryMonthly * 100) / 100,
-    total: Math.round((googleAds + inventoryMonthly) * 100) / 100,
+    inventoryPeriod: Math.round(inventoryPeriod * 100) / 100,
+    total: Math.round((googleAds + inventoryPeriod) * 100) / 100,
   };
 }
 
@@ -589,7 +606,7 @@ export default function ROIMetricsPage() {
           accent={COLORS[1]}
           subtitle={
             isNHTTR && nhttrAdSpend
-              ? `Google Ads ${formatCurrency(nhttrAdSpend.googleAds)} + Listings ${formatCurrency(nhttrAdSpend.inventoryMonthly)}/mo`
+              ? `Google Ads ${formatCurrency(nhttrAdSpend.googleAds)} (RV + TTR) + Listings ${formatCurrency(nhttrAdSpend.inventoryPeriod)}`
               : "Click for breakdown"
           }
         />
