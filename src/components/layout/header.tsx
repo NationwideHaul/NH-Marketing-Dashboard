@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
-import { Calendar, ChevronDown, GitCompareArrows, Pencil, Plus, RotateCcw } from "lucide-react";
+import { Calendar, ChevronDown, GitCompareArrows, LogOut, Pencil, Plus, RotateCcw } from "lucide-react";
 import { format, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { signOut } from "next-auth/react";
 import { useDateRange } from "@/context/date-range-context";
 import { useDashboard } from "@/context/dashboard-context";
 import { useAccount } from "@/context/account-context";
@@ -110,6 +111,16 @@ export function Header() {
           <Calendar className="h-3 w-3 text-muted-foreground" />
           <span>{format(dateRange.from, "MMM d")} – {format(dateRange.to, "MMM d, yyyy")}</span>
           <ChevronDown className="h-3 w-3 text-muted-foreground" />
+        </button>
+
+        {/* Sign Out */}
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          title="Sign out"
+          className="flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted transition-colors"
+        >
+          <LogOut className="h-3 w-3" />
+          <span>Sign out</span>
         </button>
       </div>
 
