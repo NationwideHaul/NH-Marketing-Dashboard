@@ -68,9 +68,12 @@ function useLivePlatformData(
     // NH pulls info submits from the NH Sales CRM + calls from CallRail.
     // NHTTR pulls ONLY calls from CallRail (per-platform); its info submits
     // come from GA4 website forms and are shown as a single top-level stat.
-    // NFI's full live pipeline (CRM filtered by "NFI Truck Sales" tag) is not
-    // wired yet — leave as pending.
-    const supported = accountId === "nationwide-haul" || accountId === "nhttr";
+    // NFI pulls calls from CallRail (per tracker). Info submits stay at 0
+    // until the CRM pipeline filtered by the "NFI Truck Sales" tag is wired.
+    const supported =
+      accountId === "nationwide-haul" ||
+      accountId === "nhttr" ||
+      accountId === "nfi-truck-sales";
     if (!supported) return;
 
     let cancelled = false;
