@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { Wallet, Pencil, Check, Plus, Trash2 } from "lucide-react";
+import { format } from "date-fns";
+import { Wallet, Pencil, Check, Plus, Trash2, Zap } from "lucide-react";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend,
@@ -10,6 +11,7 @@ import { formatCurrency } from "@/lib/utils";
 import { DataSourceBadge } from "@/components/layout/data-source-badge";
 import { externalLinks } from "@/lib/external-links";
 import { useAccount } from "@/context/account-context";
+import { useDateRange } from "@/context/date-range-context";
 
 interface BudgetRow {
   platform: string;
@@ -75,8 +77,83 @@ function saveBudgets(accountId: string, budgets: BudgetRow[]) {
   localStorage.setItem(getStorageKey(accountId), JSON.stringify(budgets));
 }
 
+// Fetches live ad-spend totals for the selected date range so the budget table
+// can override its stored `spent` value on advertising rows with real numbers
+// from Google Ads and Meta Ads.
+//
+// Returns a map keyed by normalized platform label:
+//   "google ads"              -> total for the primary account
+//   "google ads (rv repair)"  -> NHTTR sub-account nhttr-rv
+//   "google ads (ttr)"        -> NHTTR sub-account nhttr-ttr
+//   "meta ads"                -> Meta ads account insights
+function useLiveAdSpend(accountId: string, startDate: string, endDate: string) {
+  const [spend, setSpend] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+
+    const fetchGoogle = async (acct: string): Promise<number> => {
+      try {
+        const r = await fetch(`/api/google-ads?startDate=${startDate}&endDate=${endDate}&accountId=${acct}`);
+        const res = await r.json();
+        if (res.status !== "live") return 0;
+        const rows = Array.isArray(res.data)
+          ? res.data.flatMap((r: { results?: unknown[] }) => r.results ?? [])
+          : res.data?.results ?? [];
+        let micros = 0;
+        for (const row of rows as { metrics?: { costMicros?: string } }[]) {
+          micros += parseInt(row.metrics?.costMicros ?? "0", 10);
+        }
+        return micros / 1_000_000;
+      } catch { return 0; }
+    };
+
+    const fetchMeta = async (acct: string): Promise<number> => {
+      try {
+        const r = await fetch(`/api/meta-ads?type=ads&startDate=${startDate}&endDate=${endDate}&accountId=${acct}`);
+        const res = await r.json();
+        if (res.status !== "live") return 0;
+        const rows: Array<{ spend?: string }> = Array.isArray(res.data) ? res.data : (res.data?.data ?? []);
+        return rows.reduce((sum, row) => sum + parseFloat(row.spend ?? "0"), 0);
+      } catch { return 0; }
+    };
+
+    const tasks: Promise<[string, number]>[] = [];
+
+    if (accountId === "nhttr") {
+      tasks.push(fetchGoogle("nhttr-rv").then((v) => ["google ads (rv repair)", v] as [string, number]));
+      tasks.push(fetchGoogle("nhttr-ttr").then((v) => ["google ads (ttr)", v] as [string, number]));
+    } else {
+      tasks.push(fetchGoogle(accountId).then((v) => ["google ads", v] as [string, number]));
+    }
+
+    // Only accounts that actually run Meta ads — skip NFI and NHTTR.
+    if (accountId === "nationwide-haul" || accountId === "road-ready") {
+      tasks.push(fetchMeta(accountId).then((v) => ["meta ads", v] as [string, number]));
+    }
+
+    Promise.all(tasks).then((pairs) => {
+      if (cancelled) return;
+      const next: Record<string, number> = {};
+      for (const [k, v] of pairs) next[k] = v;
+      setSpend(next);
+      setLoading(false);
+    });
+
+    return () => { cancelled = true; };
+  }, [accountId, startDate, endDate]);
+
+  return { spend, loading };
+}
+
 export default function BudgetPage() {
   const { currentAccount } = useAccount();
+  const { dateRange } = useDateRange();
+  const startStr = format(dateRange.from, "yyyy-MM-dd");
+  const endStr = format(dateRange.to, "yyyy-MM-dd");
+  const { spend: liveSpend, loading: liveLoading } = useLiveAdSpend(currentAccount.id, startStr, endStr);
   const COLORS = currentAccount.chartPalette;
   const positiveColor = currentAccount.positiveColor;
   const primary = currentAccount.colors.primary;
@@ -106,18 +183,33 @@ export default function BudgetPage() {
     if (loaded) saveBudgets(currentAccount.id, budgets);
   }, [budgets, loaded, currentAccount.id]);
 
-  const totalBudget = budgets.reduce((s, b) => s + b.budget, 0);
-  const totalSpent = budgets.reduce((s, b) => s + b.spent, 0);
+  // Merge live ad-spend into the stored rows: advertising rows matching a
+  // tracked platform (Google Ads, Meta Ads, NHTTR splits) get their `spent`
+  // replaced with the live value for the selected date range. Everything else
+  // keeps the manually edited value from localStorage.
+  const displayBudgets = useMemo(() => {
+    return budgets.map((b) => {
+      if (b.category !== "advertising") return b;
+      const liveKey = b.platform.toLowerCase().trim();
+      if (liveKey in liveSpend) {
+        return { ...b, spent: liveSpend[liveKey], _live: true as const };
+      }
+      return b;
+    });
+  }, [budgets, liveSpend]);
 
-  const adSpend = budgets.filter((b) => b.category === "advertising").reduce((s, b) => s + b.spent, 0);
-  const platformSpend = budgets.filter((b) => b.category === "platform").reduce((s, b) => s + b.spent, 0);
-  const toolsSpend = budgets.filter((b) => b.category === "tools").reduce((s, b) => s + b.spent, 0);
+  const totalBudget = displayBudgets.reduce((s, b) => s + b.budget, 0);
+  const totalSpent = displayBudgets.reduce((s, b) => s + b.spent, 0);
 
-  const pieData = budgets.filter((b) => b.spent > 0).map((b, i) => ({
+  const adSpend = displayBudgets.filter((b) => b.category === "advertising").reduce((s, b) => s + b.spent, 0);
+  const platformSpend = displayBudgets.filter((b) => b.category === "platform").reduce((s, b) => s + b.spent, 0);
+  const toolsSpend = displayBudgets.filter((b) => b.category === "tools").reduce((s, b) => s + b.spent, 0);
+
+  const pieData = displayBudgets.filter((b) => b.spent > 0).map((b, i) => ({
     name: b.platform, value: b.spent, fill: COLORS[i % COLORS.length],
   }));
 
-  const barData = budgets.map((b) => ({
+  const barData = displayBudgets.map((b) => ({
     platform: b.platform, budget: b.budget, spent: b.spent,
   }));
 
@@ -325,10 +417,11 @@ export default function BudgetPage() {
                   </td>
                 </tr>
               )}
-              {budgets.map((b, i) => {
+              {displayBudgets.map((b, i) => {
                 const remaining = b.budget - b.spent;
                 const pacing = b.budget > 0 ? Math.round((b.spent / b.budget) * 100) : 0;
                 const isEditing = editingIdx === i;
+                const isLive = (b as { _live?: boolean })._live === true;
 
                 return (
                   <tr key={`${b.platform}-${i}`} className="border-b border-border last:border-0">
@@ -336,6 +429,11 @@ export default function BudgetPage() {
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                         <span className="font-medium text-card-foreground">{b.platform}</span>
+                        {isLive && (
+                          <span title="Live from API for the selected date range" className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                            <Zap className="h-2.5 w-2.5" /> Live
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-2.5">
@@ -352,10 +450,14 @@ export default function BudgetPage() {
                       ) : formatCurrency(b.budget)}
                     </td>
                     <td className="px-4 py-2.5 text-right font-medium text-primary">
-                      {isEditing ? (
+                      {isEditing && !isLive ? (
                         <input type="number" value={editSpent} onChange={(e) => setEditSpent(e.target.value)}
                           className="w-24 px-2 py-1 text-xs border border-primary rounded text-right" />
-                      ) : formatCurrency(b.spent)}
+                      ) : (
+                        <span className={isLive && liveLoading ? "opacity-50" : undefined}>
+                          {formatCurrency(b.spent)}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-2.5 text-right" style={{ color: remaining >= 0 ? positiveColor : "#EF4444" }}>
                       {formatCurrency(remaining)}
