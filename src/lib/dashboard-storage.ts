@@ -1,6 +1,8 @@
 import type { DashboardConfig } from "@/types/widget";
 
-const PREFIX = "nh-dash-v4-";
+// Bump this version to invalidate stale saved layouts and force fresh page
+// defaults (e.g. when new default widgets or metric fixes ship).
+const PREFIX = "nh-dash-v5-";
 
 export function saveDashboard(pageKey: string, config: DashboardConfig): void {
   if (typeof window === "undefined") return;
