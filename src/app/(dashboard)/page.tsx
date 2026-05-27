@@ -166,96 +166,10 @@ function NHOverviewHeader() {
 
 // ==================== NFI OVERVIEW ====================
 function NFIOverviewHeader() {
-  const [summaryLoading, setSummaryLoading] = useState(false);
-
-  return (
-    <div className="mb-4 rounded-xl border border-primary/20 overflow-hidden">
-      {/* Header bar */}
-      <div className="bg-primary/10 px-5 py-3 flex items-center gap-3">
-        <div className="rounded-lg bg-primary/20 p-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-        </div>
-        <div className="flex-1">
-          <h3 className="text-sm font-bold text-primary">NFI Performance Summary</h3>
-          <p className="text-[10px] text-muted-foreground">AI-generated insights for this period</p>
-        </div>
-        <button
-          onClick={() => { setSummaryLoading(true); setTimeout(() => setSummaryLoading(false), 800); }}
-          className="p-2 rounded-lg hover:bg-primary/10 transition-colors"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 text-primary ${summaryLoading ? "animate-spin" : ""}`} />
-        </button>
-      </div>
-
-      {/* 3-column insights: Summary, Highlights, Opportunities */}
-      <div className="bg-card">
-        {summaryLoading ? (
-          <div className="p-5 space-y-2">
-            <div className="h-3 w-3/4 rounded bg-primary/10 animate-pulse" />
-            <div className="h-3 w-full rounded bg-primary/10 animate-pulse" />
-            <div className="h-3 w-2/3 rounded bg-primary/10 animate-pulse" />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border">
-            {/* General Summary */}
-            <div className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Star className="h-3.5 w-3.5 text-primary" />
-                <h4 className="text-[11px] font-bold text-primary uppercase tracking-wide">Summary</h4>
-              </div>
-              <p className="text-xs text-card-foreground leading-relaxed">
-                PPC is the strongest lead driver this period — cost per click remains well below industry average for the trucking vertical. Website traffic continues to climb month over month, with Truck Paper listings driving consistent phone activity.
-              </p>
-            </div>
-
-            {/* Highlights */}
-            <div className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="h-3.5 w-3.5 text-primary" />
-                <h4 className="text-[11px] font-bold text-primary uppercase tracking-wide">Highlights</h4>
-              </div>
-              <ul className="space-y-1.5 text-xs text-card-foreground">
-                <li className="flex items-start gap-1.5">
-                  <span className="text-primary mt-0.5">+</span>
-                  <span>Website traffic up <span className="font-semibold">+16%</span> vs previous month</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-primary mt-0.5">+</span>
-                  <span>CPC holding steady at <span className="font-semibold">$1.15</span> — best in 3 months</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-primary mt-0.5">+</span>
-                  <span>Truck Paper generating <span className="font-semibold">52%</span> of all phone calls</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Opportunities */}
-            <div className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Lightbulb className="h-3.5 w-3.5 text-primary" />
-                <h4 className="text-[11px] font-bold text-primary uppercase tracking-wide">Opportunities</h4>
-              </div>
-              <ul className="space-y-1.5 text-xs text-card-foreground">
-                <li className="flex items-start gap-1.5">
-                  <span className="text-primary mt-0.5">*</span>
-                  <span>Scale top PPC campaigns — budget headroom available with strong ROAS</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-primary mt-0.5">*</span>
-                  <span>Increase Truck Paper listings — highest call conversion rate</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-primary mt-0.5">*</span>
-                  <span>Test email reply-back sequences to boost GHL engagement</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  // Removed the hardcoded "AI Performance Summary" card — it showed fabricated
+  // stats (e.g. "+16% vs previous month") that contradicted the live widgets.
+  // Real NFI metrics render in the widgets below this header.
+  return null;
 }
 
 // ==================== NHTTR OVERVIEW ====================

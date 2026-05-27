@@ -78,31 +78,6 @@ export function Header() {
           </>
         )}
 
-        {/* Comparison Toggle */}
-        <div className="relative">
-          <button
-            onClick={() => {
-              if (comparison.enabled) { setComparisonEnabled(false); setShowCompare(false); }
-              else setShowCompare(!showCompare);
-            }}
-            className={cn(
-              "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors",
-              comparison.enabled ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted"
-            )}
-          >
-            <GitCompareArrows className="h-3 w-3" />
-            {comparison.enabled ? "Comparing" : "Compare"}
-          </button>
-          {showCompare && !comparison.enabled && (
-            <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-md border border-border bg-card shadow-lg">
-              {comparisonPresets.map((p) => (
-                <button key={p.value} onClick={() => { setComparisonPreset(p.value); setShowCompare(false); }}
-                  className="block w-full px-3 py-2 text-left text-xs hover:bg-muted transition-colors">{p.label}</button>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Date Range Picker */}
         <button
           onClick={() => { setShowDatePicker(!showDatePicker); setTempRange({ from: dateRange.from, to: dateRange.to }); }}
