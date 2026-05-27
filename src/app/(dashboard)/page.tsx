@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Sparkles, RefreshCw, Truck, Phone, FileText, Globe, MapPin, MousePointerClick, Layers, TrendingUp, Lightbulb, Star } from "lucide-react";
+import { Sparkles, RefreshCw, Truck, Phone, FileText, Globe, MapPin, MousePointerClick, Layers, TrendingUp, TrendingDown, Lightbulb, Star } from "lucide-react";
 import { WidgetPage } from "@/components/widgets/widget-page";
 import { useAccount } from "@/context/account-context";
 import { useDateRange } from "@/context/date-range-context";
+import { useWidgetMetric } from "@/hooks/use-widget-data";
+import { formatNumber } from "@/lib/utils";
 
 // ==================== NH OVERVIEW ====================
 
@@ -36,12 +38,63 @@ function HorizontalBarSection({ title, items, total }: { title: string; items: {
   );
 }
 
+// Live performance-summary card. Shows REAL highlights pulled from the same
+// APIs the widgets use (GA4 + CallRail), with real deltas vs the previous
+// period. Replaces the old hardcoded "AI Performance Summary" cards.
+function SummaryMetric({ m }: { m: ReturnType<typeof useWidgetMetric> }) {
+  if (!m) return (
+    <div className="rounded-lg border border-border p-3">
+      <div className="h-3 w-20 rounded bg-muted animate-pulse mb-2" />
+      <div className="h-6 w-16 rounded bg-muted animate-pulse" />
+    </div>
+  );
+  const cp = m.changePercent ?? 0;
+  const up = cp > 0, down = cp < 0;
+  return (
+    <div className="rounded-lg border border-border p-3">
+      <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{m.label}</p>
+      <p className="text-2xl font-bold text-foreground">
+        {m.format === "currency" ? `$${formatNumber(m.value)}` : formatNumber(m.value)}
+      </p>
+      {m.changePercent != null && (
+        <span className={`mt-0.5 text-xs flex items-center gap-1 ${up ? "text-green-600" : down ? "text-red-500" : "text-muted-foreground"}`}>
+          {up ? <TrendingUp className="h-3 w-3" /> : down ? <TrendingDown className="h-3 w-3" /> : null}
+          {cp > 0 ? "+" : ""}{cp.toFixed(1)}% vs prev period
+        </span>
+      )}
+    </div>
+  );
+}
+
+function RealPerformanceSummary({ title }: { title: string }) {
+  const traffic = useWidgetMetric({ id: "ps-traffic", type: "stat", title: "Website Traffic", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true });
+  const paid = useWidgetMetric({ id: "ps-paid", type: "stat", title: "Paid Search", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true, dimension: "sessionDefaultChannelGroup", dimensionValue: "Paid Search" });
+  const calls = useWidgetMetric({ id: "ps-calls", type: "stat", title: "Phone Calls", dataSource: "callrail", metric: "totalCalls", format: "number", comparisonEnabled: true });
+
+  return (
+    <div className="mb-4 rounded-xl border border-primary/20 overflow-hidden">
+      <div className="bg-primary/10 px-5 py-3 flex items-center gap-3">
+        <div className="rounded-lg bg-primary/20 p-2">
+          <Sparkles className="h-4 w-4 text-primary" />
+        </div>
+        <div className="flex-1">
+          <h3 className="text-sm font-bold text-primary">{title}</h3>
+          <p className="text-[10px] text-muted-foreground">Live highlights for the selected date range</p>
+        </div>
+      </div>
+      <div className="bg-card p-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <SummaryMetric m={traffic} />
+          <SummaryMetric m={paid} />
+          <SummaryMetric m={calls} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NHOverviewHeader() {
-  // Removed the hardcoded NH Overview header — the "AI Performance Summary"
-  // and the "Where calls/info came from" + "Top trailers" sections all used
-  // fabricated numbers (63 leads, $0.22 CPC, 146 calls, etc.). Real NH metrics
-  // render in the widgets below. Rebuild these from live data once available.
-  return null;
+  return <RealPerformanceSummary title="NH Performance Summary" />;
 }
 
 function _RemovedNHOverviewHeader() {
@@ -174,10 +227,7 @@ function _RemovedNHOverviewHeader() {
 
 // ==================== NFI OVERVIEW ====================
 function NFIOverviewHeader() {
-  // Removed the hardcoded "AI Performance Summary" card — it showed fabricated
-  // stats (e.g. "+16% vs previous month") that contradicted the live widgets.
-  // Real NFI metrics render in the widgets below this header.
-  return null;
+  return <RealPerformanceSummary title="NFI Performance Summary" />;
 }
 
 // ==================== NHTTR OVERVIEW ====================
