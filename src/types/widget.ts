@@ -38,6 +38,7 @@ export interface WidgetConfig {
   comparisonEnabled?: boolean;
   goalValue?: number;
   dimension?: string; // GA4 dimension override (e.g. "deviceCategory", "sessionDefaultChannelGroup", "sessionSource")
+  dimensionValue?: string; // With `dimension`: filter a stat to one row (e.g. "Paid Search") instead of summing all rows
   manualValue?: number; // For manual-stat widgets: default value (editable by user, persisted in localStorage)
   sectionTitle?: string; // For section-header widgets: display title
   trendMonths?: number; // For chart widgets: override date range to show N months of data

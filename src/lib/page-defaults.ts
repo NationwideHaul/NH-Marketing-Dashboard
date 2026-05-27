@@ -324,7 +324,7 @@ export const nfiOverviewDefaults: PageDefault = {
     { id: "nfi-3", type: "stat", title: "Email Campaign Clicks", dataSource: "email-logs", metric: "clicked", format: "number", comparisonEnabled: true },
     { id: "nfi-3b", type: "stat", title: "Email Campaign Replied", dataSource: "email-logs", metric: "replied", format: "number", comparisonEnabled: true },
     // Row 2: PPC stats
-    { id: "nfi-4", type: "stat", title: "Paid Search Traffic (PPC)", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true, dimension: "sessionDefaultChannelGroup" },
+    { id: "nfi-4", type: "stat", title: "Paid Search Traffic (PPC)", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true, dimension: "sessionDefaultChannelGroup", dimensionValue: "Paid Search" },
     { id: "nfi-5", type: "stat", title: "PPC Total Clicks", dataSource: "google-ads", metric: "clicks", format: "number", comparisonEnabled: true },
     { id: "nfi-6", type: "stat", title: "PPC Cost Per Click", dataSource: "google-ads", metric: "cpc", format: "currency", comparisonEnabled: true },
     { id: "nfi-7", type: "stat", title: "PPC Identified Conversions", dataSource: "google-ads", metric: "conversions", format: "number", comparisonEnabled: true },

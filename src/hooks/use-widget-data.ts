@@ -77,13 +77,16 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
   const endDate = format(dateRange.to, "yyyy-MM-dd");
   const route = getApiRoute(config.dataSource);
   const sep = route.includes("?") ? "&" : "?";
-  const url = `${route}${sep}startDate=${startDate}&endDate=${endDate}&accountId=${apiAccountId}`;
+  // When a widget targets a single dimension value (e.g. Paid Search channel),
+  // request the dimension breakdown so extractMetric can pick that row.
+  const dimensionParam = config.dimension ? `&dimension=${encodeURIComponent(config.dimension)}` : "";
+  const url = `${route}${sep}startDate=${startDate}&endDate=${endDate}&accountId=${apiAccountId}${dimensionParam}`;
 
   // Calculate previous period (same duration, immediately before)
   const days = differenceInDays(dateRange.to, dateRange.from) + 1;
   const prevEnd = subDays(dateRange.from, 1);
   const prevStart = subDays(prevEnd, days - 1);
-  const prevUrl = `${route}${sep}startDate=${format(prevStart, "yyyy-MM-dd")}&endDate=${format(prevEnd, "yyyy-MM-dd")}&accountId=${apiAccountId}`;
+  const prevUrl = `${route}${sep}startDate=${format(prevStart, "yyyy-MM-dd")}&endDate=${format(prevEnd, "yyyy-MM-dd")}&accountId=${apiAccountId}${dimensionParam}`;
 
   // SWR keys are null for email-logs so no network request fires. Hooks still
   // run unconditionally to keep React's hook ordering stable.
@@ -125,7 +128,7 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
   if (!data || data.status === "error") return null;
 
   // Extract the metric from the API response
-  const metricValue = extractMetric(data, config.metric, config.dataSource, config.tracker);
+  const metricValue = extractMetric(data, config.metric, config.dataSource, config.tracker, config.dimensionValue);
   if (metricValue === null) return null;
 
   // Compute trend vs previous period
@@ -133,7 +136,7 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
   let changePercent = 0;
 
   if (config.comparisonEnabled && prevData && prevData.status !== "error") {
-    const prevValue = extractMetric(prevData, config.metric, config.dataSource, config.tracker);
+    const prevValue = extractMetric(prevData, config.metric, config.dataSource, config.tracker, config.dimensionValue);
     if (prevValue !== null && prevValue !== 0) {
       changePercent = ((metricValue - prevValue) / prevValue) * 100;
       trend = changePercent > 0 ? "up" : changePercent < 0 ? "down" : "flat";
@@ -208,7 +211,7 @@ export function useWidgetAllMetrics(config: WidgetConfig): KPIMetric[] {
 
 // ========== DATA EXTRACTION HELPERS ==========
 
-function extractMetric(apiResponse: any, metric: string, dataSource: string, tracker?: string): number | null { // eslint-disable-line @typescript-eslint/no-explicit-any
+function extractMetric(apiResponse: any, metric: string, dataSource: string, tracker?: string, dimensionValue?: string): number | null { // eslint-disable-line @typescript-eslint/no-explicit-any
   const d = apiResponse.data;
   if (!d) {
     // Some routes return metrics at top level
@@ -324,11 +327,15 @@ function extractMetric(apiResponse: any, metric: string, dataSource: string, tra
 
   // Google Analytics format (GA4 returns rows)
   if (d.rows) {
-    // Sum up metric from rows
     const metricIndex = getGA4MetricIndex(metric);
     if (metricIndex >= 0) {
+      // When a dimensionValue is set (e.g. "Paid Search"), the rows are broken
+      // down by that dimension — sum only the matching row(s), not every channel.
+      const rows = dimensionValue
+        ? d.rows.filter((row: any) => row.dimensionValues?.[0]?.value === dimensionValue) // eslint-disable-line @typescript-eslint/no-explicit-any
+        : d.rows;
       let total = 0;
-      d.rows.forEach((row: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+      rows.forEach((row: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         total += parseFloat(row.metricValues?.[metricIndex]?.value || "0");
       });
       return Math.round(total * 100) / 100;
