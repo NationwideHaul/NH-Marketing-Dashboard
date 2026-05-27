@@ -55,7 +55,8 @@ export const gaDefaults: PageDefault = {
     { id: "ga-5", type: "area-chart", title: "Traffic Over Time", dataSource: "google-analytics", metric: "sessions", format: "number" },
     { id: "ga-6", type: "bar-chart", title: "Users by Channel", dataSource: "google-analytics", metric: "users", format: "number", dimension: "sessionDefaultChannelGroup" },
     // Row 3: Search/Organic/Paid
-    { id: "ga-7", type: "stat", title: "Organic Traffic", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true },
+    { id: "ga-7", type: "stat", title: "Organic Traffic", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true, dimension: "sessionDefaultChannelGroup", dimensionValue: "Organic Search" },
+    { id: "ga-12", type: "stat", title: "Paid Search Traffic", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true, dimension: "sessionDefaultChannelGroup", dimensionValue: "Paid Search" },
     { id: "ga-8", type: "stat", title: "Conversions", dataSource: "google-analytics", metric: "conversions", format: "number", comparisonEnabled: true },
     { id: "ga-9", type: "stat", title: "Avg. Session Duration", dataSource: "google-analytics", metric: "avgSessionDuration", format: "number", comparisonEnabled: true },
     // Row 4: Device + Engagement chart
@@ -66,13 +67,13 @@ export const gaDefaults: PageDefault = {
     lg: [
       ...row([{ id: "ga-1", w: 3, h: 2 }, { id: "ga-2", w: 3, h: 2 }, { id: "ga-3", w: 3, h: 2 }, { id: "ga-4", w: 3, h: 2 }], 0),
       ...row([{ id: "ga-5", w: 6, h: 5, minW: 3, minH: 3 }, { id: "ga-6", w: 6, h: 5, minW: 3, minH: 3 }], 2),
-      ...row([{ id: "ga-7", w: 4, h: 2 }, { id: "ga-8", w: 4, h: 2 }, { id: "ga-9", w: 4, h: 2 }], 7),
+      ...row([{ id: "ga-7", w: 3, h: 2 }, { id: "ga-12", w: 3, h: 2 }, { id: "ga-8", w: 3, h: 2 }, { id: "ga-9", w: 3, h: 2 }], 7),
       ...row([{ id: "ga-10", w: 4, h: 5, minW: 3, minH: 3 }, { id: "ga-11", w: 8, h: 5, minW: 3, minH: 3 }], 9),
     ],
     md: [
       ...row([{ id: "ga-1", w: 2, h: 2 }, { id: "ga-2", w: 2, h: 2 }, { id: "ga-3", w: 2, h: 2 }, { id: "ga-4", w: 2, h: 2 }], 0),
       ...row([{ id: "ga-5", w: 4, h: 5, minW: 3, minH: 3 }, { id: "ga-6", w: 4, h: 5, minW: 3, minH: 3 }], 2),
-      ...row([{ id: "ga-7", w: 3, h: 2 }, { id: "ga-8", w: 3, h: 2 }, { id: "ga-9", w: 2, h: 2 }], 7),
+      ...row([{ id: "ga-7", w: 2, h: 2 }, { id: "ga-12", w: 2, h: 2 }, { id: "ga-8", w: 2, h: 2 }, { id: "ga-9", w: 2, h: 2 }], 7),
       ...row([{ id: "ga-10", w: 4, h: 5, minW: 3, minH: 3 }, { id: "ga-11", w: 4, h: 5, minW: 3, minH: 3 }], 9),
     ],
   },
