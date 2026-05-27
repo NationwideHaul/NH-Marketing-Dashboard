@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCRMSummary } from "@/lib/api-clients/nationwide-haul-crm";
+import { getCRMSummary, brandForAccount } from "@/lib/api-clients/nationwide-haul-crm";
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, differenceInCalendarMonths } from "date-fns";
 
 /**
@@ -20,6 +20,10 @@ const SOURCE_TO_PLATFORM: Record<string, string> = {
   "Rentalyard": "Rentalyard",
   "Rentalyard.com": "Rentalyard",
   "RitchieList": "RitchieList",
+  // NFI Truck Sales website sources
+  "nfitrucksales.com": "NFI Website",
+  "NFI Website": "NFI Website",
+  "nfi-website": "NFI Website",
 };
 
 /**
@@ -31,6 +35,8 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const endDateStr = searchParams.get("endDate") || format(new Date(), "yyyy-MM-dd");
   const startDateStr = searchParams.get("startDate") || format(subMonths(new Date(), 6), "yyyy-MM-dd");
+  // Filter info submits to the account's brand (NFI gets only NFI-tagged leads).
+  const brand = brandForAccount(searchParams.get("accountId"));
 
   if (!process.env.NH_CRM_API_KEY) {
     return NextResponse.json({ status: "error", message: "NH_CRM_API_KEY not configured.", data: null });
@@ -59,7 +65,7 @@ export async function GET(request: NextRequest) {
     const apiResults = await Promise.all(
       monthRanges.map(async ({ start, end, monthLabel, monthKey }) => {
         try {
-          const data = await getCRMSummary(start, end);
+          const data = await getCRMSummary(start, end, brand);
           if (debug) {
             for (const [t, c] of Object.entries(data.leads.byType || {})) {
               typesSeen[t] = (typesSeen[t] || 0) + c;

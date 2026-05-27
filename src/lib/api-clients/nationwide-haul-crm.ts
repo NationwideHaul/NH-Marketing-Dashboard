@@ -44,12 +44,23 @@ async function getHeaders() {
   };
 }
 
+// Brand filter understood by the CRM summary endpoint.
+export type CRMBrand = "nfi-truck-sales" | "nationwide-haul";
+
+// Maps dashboard account IDs to the CRM brand filter. Only brands the CRM can
+// segment (via the deal tag) are listed; others return the full dataset.
+export function brandForAccount(accountId?: string | null): CRMBrand | undefined {
+  return accountId === "nfi-truck-sales" ? "nfi-truck-sales" : undefined;
+}
+
 // Fetch the full CRM marketing summary
 export async function getCRMSummary(
   startDate: string, // YYYY-MM-DD
-  endDate: string    // YYYY-MM-DD
+  endDate: string,   // YYYY-MM-DD
+  brand?: CRMBrand
 ): Promise<CRMSummaryResponse> {
   const params = new URLSearchParams({ startDate, endDate });
+  if (brand) params.set("brand", brand);
   const response = await fetch(`${CRM_BASE_URL}/summary?${params}`, {
     headers: await getHeaders(),
   });
@@ -58,8 +69,8 @@ export async function getCRMSummary(
 }
 
 // KPI-formatted lead metrics for dashboard widgets
-export async function getCRMLeadMetrics(startDate: string, endDate: string) {
-  const data = await getCRMSummary(startDate, endDate);
+export async function getCRMLeadMetrics(startDate: string, endDate: string, brand?: CRMBrand) {
+  const data = await getCRMSummary(startDate, endDate, brand);
   const { leads, period } = data;
 
   return {
@@ -81,8 +92,8 @@ export async function getCRMLeadMetrics(startDate: string, endDate: string) {
 }
 
 // KPI-formatted revenue and deal metrics for dashboard widgets
-export async function getCRMRevenueMetrics(startDate: string, endDate: string) {
-  const data = await getCRMSummary(startDate, endDate);
+export async function getCRMRevenueMetrics(startDate: string, endDate: string, brand?: CRMBrand) {
+  const data = await getCRMSummary(startDate, endDate, brand);
   const { deals, period } = data;
 
   return {
@@ -100,8 +111,8 @@ export async function getCRMRevenueMetrics(startDate: string, endDate: string) {
 }
 
 // Funnel stage metrics for pipeline visualization
-export async function getCRMFunnelMetrics(startDate: string, endDate: string) {
-  const data = await getCRMSummary(startDate, endDate);
+export async function getCRMFunnelMetrics(startDate: string, endDate: string, brand?: CRMBrand) {
+  const data = await getCRMSummary(startDate, endDate, brand);
   const { funnel, period } = data;
 
   const stages = [

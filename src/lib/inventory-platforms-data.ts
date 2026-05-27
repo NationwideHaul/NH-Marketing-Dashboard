@@ -170,9 +170,10 @@ const nhttrPlatforms: PlatformData[] = [
   },
 ];
 
-// NFI Truck Sales — listing platforms. Data pipeline TODO:
+// NFI Truck Sales — listing platforms. Live data pipeline:
 //   - calls: from CallRail NFI company (182573673), filtered by trackerName
-//   - infoSubmits: from NH Sales CRM filtered by NFI tag ("NFI Truck Sales")
+//   - infoSubmits: from NH Sales CRM filtered by the "NFI Truck Sales" deal tag
+//     (GET /api/inventory-platform-leads?accountId=nfi-truck-sales)
 const nfiPlatforms: PlatformData[] = [
   {
     name: "NFI Website",

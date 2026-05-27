@@ -68,8 +68,8 @@ function useLivePlatformData(
     // NH pulls info submits from the NH Sales CRM + calls from CallRail.
     // NHTTR pulls ONLY calls from CallRail (per-platform); its info submits
     // come from GA4 website forms and are shown as a single top-level stat.
-    // NFI pulls calls from CallRail (per tracker). Info submits stay at 0
-    // until the CRM pipeline filtered by the "NFI Truck Sales" tag is wired.
+    // NFI pulls calls from CallRail (per tracker) + info submits from the CRM
+    // filtered to the "NFI Truck Sales" deal tag (via accountId on the route).
     const supported =
       accountId === "nationwide-haul" ||
       accountId === "nhttr" ||
@@ -79,8 +79,8 @@ function useLivePlatformData(
     let cancelled = false;
     setLoading(true);
 
-    const crmPromise = accountId === "nationwide-haul"
-      ? fetch(`/api/inventory-platform-leads?startDate=${startDate}&endDate=${endDate}`)
+    const crmPromise = accountId === "nationwide-haul" || accountId === "nfi-truck-sales"
+      ? fetch(`/api/inventory-platform-leads?startDate=${startDate}&endDate=${endDate}&accountId=${accountId}`)
           .then((r) => r.json())
           .catch(() => null)
       : Promise.resolve(null);
