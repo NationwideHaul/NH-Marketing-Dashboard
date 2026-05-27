@@ -51,7 +51,7 @@ export async function getCalls(
       end_date: endDate,
       per_page: String(perPage),
       page: String(page),
-      fields: "source_name,tracker_id",
+      fields: "source_name,tracker_id,start_time",
     });
     if (companyId) params.set("company_id", companyId);
 

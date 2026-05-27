@@ -37,6 +37,14 @@ function HorizontalBarSection({ title, items, total }: { title: string; items: {
 }
 
 function NHOverviewHeader() {
+  // Removed the hardcoded NH Overview header — the "AI Performance Summary"
+  // and the "Where calls/info came from" + "Top trailers" sections all used
+  // fabricated numbers (63 leads, $0.22 CPC, 146 calls, etc.). Real NH metrics
+  // render in the widgets below. Rebuild these from live data once available.
+  return null;
+}
+
+function _RemovedNHOverviewHeader() {
   const [summaryLoading, setSummaryLoading] = useState(false);
 
   // Call sources (from CRM/CallRail)

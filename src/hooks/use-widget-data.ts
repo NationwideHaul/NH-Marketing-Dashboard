@@ -542,6 +542,20 @@ function extractTimeSeries(apiResponse: any, metric: string): { date: string; va
     }).filter((p: any) => p.date); // eslint-disable-line @typescript-eslint/no-explicit-any
   }
 
+  // CallRail: build a monthly series by counting calls from the raw calls array
+  if (apiResponse.platform === "callrail" && Array.isArray(d?.calls)) {
+    const byMonth: Record<string, number> = {};
+    for (const c of d.calls) { // eslint-disable-line @typescript-eslint/no-explicit-any
+      const t = c.start_time || c.created_at || c.start_time_formatted;
+      if (!t) continue;
+      const key = String(t).slice(0, 7) + "-01"; // YYYY-MM-01 bucket
+      byMonth[key] = (byMonth[key] || 0) + 1;
+    }
+    return Object.entries(byMonth)
+      .map(([date, value]) => ({ date, value }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
   // GA4: rows with date dimension
   if (d.rows) {
     return d.rows.map((row: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
