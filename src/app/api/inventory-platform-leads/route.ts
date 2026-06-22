@@ -1,29 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCRMSummary, brandForAccount } from "@/lib/api-clients/nationwide-haul-crm";
+import { normalizeCRMSource } from "@/lib/crm-source-normalize";
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, differenceInCalendarMonths } from "date-fns";
 
 /**
- * Maps CRM lead source names → inventory platform names.
+ * Maps canonical CRM lead source names (see normalizeCRMSource) → inventory
+ * platform names. Sources are normalized before lookup, so only canonical keys
+ * are needed here.
  */
 const SOURCE_TO_PLATFORM: Record<string, string> = {
   "TruckPaper": "TruckPaper",
-  "TruckPaper.com": "TruckPaper",
-  "Truckpaper.com": "TruckPaper",
   "Commercial Truck Trader": "Commercial Truck Trader",
   "My Little Salesman": "My Little Salesman",
   "Cherry Trader": "Cherry Trader",
-  "nationwidehaul.com": "NH Website",
-  "Website": "NH Website",
-  "website": "NH Website",
+  "Nationwide Haul Website": "NH Website",
   "FormSubmit": "NH Website",
   "CognitoForms": "NH Website",
   "Rentalyard": "Rentalyard",
-  "Rentalyard.com": "Rentalyard",
   "RitchieList": "RitchieList",
-  // NFI Truck Sales website sources
-  "nfitrucksales.com": "NFI Website",
+  // NFI Truck Sales website
   "NFI Website": "NFI Website",
-  "nfi-website": "NFI Website",
 };
 
 /**
@@ -76,7 +72,7 @@ export async function GET(request: NextRequest) {
           }
           const byPlatform: Record<string, number> = {};
           for (const [source, count] of Object.entries(data.leads.bySource)) {
-            const platform = SOURCE_TO_PLATFORM[source];
+            const platform = SOURCE_TO_PLATFORM[normalizeCRMSource(source)];
             if (platform) byPlatform[platform] = (byPlatform[platform] || 0) + count;
           }
           return { month: monthLabel, monthKey, byPlatform };

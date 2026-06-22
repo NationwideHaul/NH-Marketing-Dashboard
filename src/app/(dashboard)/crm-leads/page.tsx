@@ -10,6 +10,7 @@ import { TrendingUp, TrendingDown, Users, DollarSign, Target, Award } from "luci
 import { useDateRange } from "@/context/date-range-context";
 import { useAccount } from "@/context/account-context";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
+import { aggregateBySource } from "@/lib/crm-source-normalize";
 
 const fetcher = (url: string) =>
   fetch(url)
@@ -113,9 +114,11 @@ export default function CRMLeadsPage() {
   const deals = summary?.deals;
   const funnel = summary?.funnel;
 
-  // Build "leads by source" bar chart data
+  // Build "leads by source" bar chart data — collapse duplicate CRM source
+  // spellings (AnswerConnect/Answer Connect, Meta/Facebook, website variants)
+  // into canonical names before charting.
   const bySourceData = leads?.bySource
-    ? Object.entries(leads.bySource as Record<string, number>)
+    ? Object.entries(aggregateBySource(leads.bySource as Record<string, number>))
         .map(([source, count]) => ({ source, count }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 10)
