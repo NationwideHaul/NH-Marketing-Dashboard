@@ -38,8 +38,16 @@ export function normalizeCRMSource(raw: string): string {
   // host match below, since the address contains "nationwidehaul.com".
   if (lower.includes("marketing@nationwidehaul") || lower === "email marketing") return "Email Marketing";
 
+  // Sandhills marketplace aggregator (parent of TruckPaper / Commercial Truck
+  // Trader / etc). Lead routed through their cloud — exact marketplace unknown,
+  // so keep its own bucket rather than guessing.
+  if (lower.includes("sandhills")) return "Sandhills";
+
+  // Internal / manual entry usernames leaking in as a source.
+  if (compact === "imanpro") return "Direct/Other";
+
   // Websites
-  if (lower.includes("nfitrucksales") || lower === "nfi website" || lower === "nfi-website") return "NFI Website";
+  if (lower.includes("nfitrucksales") || lower === "nfi truck sales" || lower === "nfi website" || lower === "nfi-website") return "NFI Website";
   if (
     lower.includes("nationwidehaul.com") ||
     lower.includes("inventory.nationwidehaul") ||

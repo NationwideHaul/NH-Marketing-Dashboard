@@ -49,8 +49,12 @@ export type CRMBrand = "nfi-truck-sales" | "nationwide-haul";
 
 // Maps dashboard account IDs to the CRM brand filter. Only brands the CRM can
 // segment (via the deal tag) are listed; others return the full dataset.
+// NH and NFI now both segment, so each account sees only its own leads instead
+// of NH showing the combined NH+NFI total.
 export function brandForAccount(accountId?: string | null): CRMBrand | undefined {
-  return accountId === "nfi-truck-sales" ? "nfi-truck-sales" : undefined;
+  if (accountId === "nfi-truck-sales") return "nfi-truck-sales";
+  if (accountId === "nationwide-haul") return "nationwide-haul";
+  return undefined;
 }
 
 // Fetch the full CRM marketing summary
