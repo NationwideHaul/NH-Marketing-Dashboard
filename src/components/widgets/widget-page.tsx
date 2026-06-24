@@ -19,9 +19,10 @@ interface WidgetPageProps {
   title?: string;
   description?: string;
   headerContent?: React.ReactNode;
+  headerBadge?: React.ReactNode;
 }
 
-export function WidgetPage({ title, description, headerContent }: WidgetPageProps) {
+export function WidgetPage({ title, description, headerContent, headerBadge }: WidgetPageProps) {
   const pathname = usePathname();
   const { widgets, layouts, editMode, showPicker, updateLayouts } = useDashboard();
   const { currentAccount } = useAccount();
@@ -63,7 +64,12 @@ export function WidgetPage({ title, description, headerContent }: WidgetPageProp
     <div ref={containerRef}>
       {(title || headerContent) && (
         <div className="mb-6">
-          {title && <h2 className="text-lg font-bold text-foreground">{title}</h2>}
+          {title && (
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold text-foreground">{title}</h2>
+              {headerBadge}
+            </div>
+          )}
           {description && <p className="text-sm text-muted-foreground">{description}</p>}
           {sources.length > 0 && <DataSourceBadge sources={sources} />}
           {headerContent && <div className="mt-4">{headerContent}</div>}

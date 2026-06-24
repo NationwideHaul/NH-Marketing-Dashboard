@@ -1,6 +1,7 @@
 export type WidgetType =
   | "stat"
   | "interactive-stat"
+  | "info-submit-total"
   | "manual-stat"
   | "line-chart"
   | "bar-chart"
@@ -26,7 +27,8 @@ export type DataSource =
   | "gmb"
   | "linkedin"
   | "overview"
-  | "nationwide-haul-crm";
+  | "nationwide-haul-crm"
+  | "info-submits";
 
 export interface WidgetConfig {
   id: string;

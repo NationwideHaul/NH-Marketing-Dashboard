@@ -52,6 +52,7 @@ function getApiRoute(dataSource: string): string {
     "linkedin": "/api/linkedin",
     "overview": "/api/google-analytics", // default
     "nationwide-haul-crm": "/api/nationwide-haul-crm",
+    "info-submits": "/api/inventory-platform-leads",
   };
   return routes[dataSource] || "/api/google-analytics";
 }
@@ -226,6 +227,23 @@ function extractMetric(apiResponse: any, metric: string, dataSource: string, tra
       return apiResponse.metrics[metric];
     }
     return null;
+  }
+
+  // Info submits per inventory platform (from /api/inventory-platform-leads).
+  // data is [{ month, monthKey, byPlatform: { Platform: count } }]. Sum across
+  // months — all platforms, or just one when dimensionValue names a platform.
+  if (dataSource === "info-submits") {
+    const months = Array.isArray(d) ? d : [];
+    let total = 0;
+    for (const m of months) {
+      const bp = (m?.byPlatform ?? {}) as Record<string, number>;
+      if (dimensionValue) {
+        total += bp[dimensionValue] ?? 0;
+      } else {
+        for (const v of Object.values(bp)) total += Number(v) || 0;
+      }
+    }
+    return total;
   }
 
   // Nationwide Haul CRM format (nested summary response)
@@ -438,6 +456,17 @@ function extractTimeSeries(apiResponse: any, metric: string): { date: string; va
   const d = apiResponse.data;
   if (!d) return null;
 
+  // Info submits per platform (inventory-platform-leads): monthly totals.
+  // Shape: [{ month, monthKey, byPlatform }]. Detected by the byPlatform key.
+  if (Array.isArray(d) && d.length > 0 && d[0] && typeof d[0] === "object" && "byPlatform" in d[0]) {
+    return d.map((m: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+      const bp = m.byPlatform ?? {};
+      let total = 0;
+      for (const v of Object.values(bp)) total += Number(v) || 0;
+      return { date: `${m.monthKey || ""}-01`, value: total };
+    }).filter((p: { date: string }) => p.date.length > 4);
+  }
+
   // Nationwide Haul CRM: leads or deals time series
   if (apiResponse.platform === "nationwide-haul-crm") {
     if (metric === "totalRevenue" || metric === "closedWon" || metric === "avgDealValue") {
@@ -446,11 +475,13 @@ function extractTimeSeries(apiResponse: any, metric: string): { date: string; va
     return d.leads?.timeSeries ?? d.timeSeries ?? null;
   }
 
-  // CallRail: extract from calls array by date
-  if (apiResponse.platform === "callrail" && d.calls) {
+  // CallRail: extract from calls array by date. CallRail calls carry start_time
+  // (created_at is often absent), so fall back across both.
+  if (apiResponse.platform === "callrail" && Array.isArray(d.calls)) {
     const byDate: Record<string, number> = {};
     d.calls.forEach((call: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-      const date = call.created_at?.split("T")[0] || call.created_at?.split(" ")[0];
+      const raw = call.start_time || call.created_at || call.start_time_formatted || "";
+      const date = String(raw).split("T")[0].split(" ")[0];
       if (date) byDate[date] = (byDate[date] || 0) + 1;
     });
     return Object.entries(byDate).map(([date, value]) => ({ date, value })).sort((a, b) => a.date.localeCompare(b.date));

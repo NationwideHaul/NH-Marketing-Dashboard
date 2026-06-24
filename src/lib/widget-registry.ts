@@ -21,6 +21,7 @@ export const chartTypes: { key: WidgetType; label: string; icon: string }[] = [
 export const defaultWidgetSizes: Record<WidgetType, { w: number; h: number; minW: number; minH: number }> = {
   "stat": { w: 3, h: 2, minW: 2, minH: 2 },
   "interactive-stat": { w: 3, h: 2, minW: 2, minH: 2 },
+  "info-submit-total": { w: 3, h: 2, minW: 2, minH: 2 },
   "manual-stat": { w: 3, h: 2, minW: 2, minH: 2 },
   "line-chart": { w: 6, h: 5, minW: 3, minH: 3 },
   "bar-chart": { w: 6, h: 5, minW: 3, minH: 3 },

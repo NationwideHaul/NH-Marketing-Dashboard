@@ -332,9 +332,12 @@ export const nfiOverviewDefaults: PageDefault = {
     // Row 3: Calls & Truck Paper
     { id: "nfi-8", type: "stat", title: "Total Phone Calls (CallRail)", dataSource: "callrail", metric: "totalCalls", format: "number", comparisonEnabled: true },
     { id: "nfi-9", type: "stat", title: "Truck Paper Phone Calls", dataSource: "callrail", metric: "totalCalls", format: "number", comparisonEnabled: true, tracker: "Truck Paper" },
-    // Info submits + banner clicks are manually tracked until the NFI-tagged
-    // CRM pipeline is wired up. Hover the card and click the pencil to edit.
-    { id: "nfi-10", type: "manual-stat", title: "Truck Paper Info Submits", dataSource: "overview", metric: "truckPaperInfoSubmits", format: "number", manualValue: 0 },
+    // Live from the CRM (info-submit channel, lead_source=TruckPaper) — mirrors
+    // the Inventory Platforms tab, no manual editing.
+    { id: "nfi-10", type: "stat", title: "Truck Paper Info Submits", dataSource: "info-submits", metric: "infoSubmits", format: "number", dimensionValue: "TruckPaper" },
+    // Total info submits across all platforms — click to see the per-platform breakdown.
+    { id: "nfi-11", type: "info-submit-total", title: "Total Info Submits", dataSource: "info-submits", metric: "infoSubmits", format: "number" },
+    // Banner clicks stay manual (not captured by the CRM).
     { id: "nfi-12", type: "manual-stat", title: "Banner Ad Clicks (Truck Paper)", dataSource: "overview", metric: "bannerClicks", format: "number", manualValue: 0 },
     // Section: Trends Over Time
     { id: "nfi-sec", type: "section-header", title: "Trends Over Time", dataSource: "overview", metric: "none", format: "number", sectionTitle: "Trends Over Time" },
@@ -344,7 +347,7 @@ export const nfiOverviewDefaults: PageDefault = {
     { id: "nfi-15", type: "line-chart", title: "PPC Conversions", dataSource: "google-ads", metric: "conversions", format: "number", yearToDate: true },
     { id: "nfi-16", type: "line-chart", title: "PPC Cost Per Click", dataSource: "google-ads", metric: "cpc", format: "currency", yearToDate: true },
     { id: "nfi-17", type: "area-chart", title: "Total Phone Calls", dataSource: "callrail", metric: "totalCalls", format: "number", yearToDate: true },
-    { id: "nfi-18", type: "bar-chart", title: "Email Opens", dataSource: "email-marketing", metric: "emailsSent", format: "number", yearToDate: true },
+    { id: "nfi-18", type: "area-chart", title: "Info Submits (Total)", dataSource: "info-submits", metric: "infoSubmits", format: "number", yearToDate: true },
   ],
   layouts: {
     lg: [
@@ -352,23 +355,26 @@ export const nfiOverviewDefaults: PageDefault = {
       ...row([{ id: "nfi-1", w: 3, h: 2 }, { id: "nfi-2", w: 3, h: 2 }, { id: "nfi-3", w: 3, h: 2 }, { id: "nfi-3b", w: 3, h: 2 }], 0),
       // Row 2: 4 stat cards (PPC)
       ...row([{ id: "nfi-4", w: 3, h: 2 }, { id: "nfi-5", w: 3, h: 2 }, { id: "nfi-6", w: 3, h: 2 }, { id: "nfi-7", w: 3, h: 2 }], 2),
-      // Row 3: 4 stat cards (calls + truck paper)
-      ...row([{ id: "nfi-8", w: 3, h: 2 }, { id: "nfi-9", w: 3, h: 2 }, { id: "nfi-10", w: 3, h: 2 }, { id: "nfi-12", w: 3, h: 2 }], 4),
+      // Row 3: phone-call totals + info submits (Truck Paper + Total Info Submits)
+      ...row([{ id: "nfi-8", w: 3, h: 2 }, { id: "nfi-9", w: 3, h: 2 }, { id: "nfi-10", w: 3, h: 2 }, { id: "nfi-11", w: 3, h: 2 }], 4),
+      // Row 3b: banner clicks (manual)
+      ...row([{ id: "nfi-12", w: 3, h: 2 }], 6),
       // Section header
-      ...row([{ id: "nfi-sec", w: 12, h: 1 }], 6),
+      ...row([{ id: "nfi-sec", w: 12, h: 1 }], 8),
       // Row 4: 3 charts
-      ...row([{ id: "nfi-13", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-14", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-15", w: 4, h: 5, minW: 3, minH: 3 }], 7),
+      ...row([{ id: "nfi-13", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-14", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-15", w: 4, h: 5, minW: 3, minH: 3 }], 9),
       // Row 5: 3 more charts
-      ...row([{ id: "nfi-16", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-17", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-18", w: 4, h: 5, minW: 3, minH: 3 }], 12),
+      ...row([{ id: "nfi-16", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-17", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-18", w: 4, h: 5, minW: 3, minH: 3 }], 14),
     ],
     md: [
       ...row([{ id: "nfi-1", w: 2, h: 2 }, { id: "nfi-2", w: 2, h: 2 }, { id: "nfi-3", w: 2, h: 2 }, { id: "nfi-3b", w: 2, h: 2 }], 0),
       ...row([{ id: "nfi-4", w: 2, h: 2 }, { id: "nfi-5", w: 2, h: 2 }, { id: "nfi-6", w: 2, h: 2 }, { id: "nfi-7", w: 2, h: 2 }], 2),
-      ...row([{ id: "nfi-8", w: 2, h: 2 }, { id: "nfi-9", w: 2, h: 2 }, { id: "nfi-10", w: 2, h: 2 }, { id: "nfi-12", w: 2, h: 2 }], 4),
-      ...row([{ id: "nfi-sec", w: 8, h: 1 }], 6),
-      ...row([{ id: "nfi-13", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-14", w: 4, h: 5, minW: 3, minH: 3 }], 7),
-      ...row([{ id: "nfi-15", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-16", w: 4, h: 5, minW: 3, minH: 3 }], 12),
-      ...row([{ id: "nfi-17", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-18", w: 4, h: 5, minW: 3, minH: 3 }], 17),
+      ...row([{ id: "nfi-8", w: 2, h: 2 }, { id: "nfi-9", w: 2, h: 2 }, { id: "nfi-10", w: 2, h: 2 }, { id: "nfi-11", w: 2, h: 2 }], 4),
+      ...row([{ id: "nfi-12", w: 2, h: 2 }], 6),
+      ...row([{ id: "nfi-sec", w: 8, h: 1 }], 8),
+      ...row([{ id: "nfi-13", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-14", w: 4, h: 5, minW: 3, minH: 3 }], 9),
+      ...row([{ id: "nfi-15", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-16", w: 4, h: 5, minW: 3, minH: 3 }], 14),
+      ...row([{ id: "nfi-17", w: 4, h: 5, minW: 3, minH: 3 }, { id: "nfi-18", w: 4, h: 5, minW: 3, minH: 3 }], 19),
     ],
   },
 };

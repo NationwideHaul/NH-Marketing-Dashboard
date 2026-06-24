@@ -9,6 +9,7 @@ import { GoalWidget } from "./goal-widget";
 import { TableWidget } from "./table-widget";
 import { ManualStatWidget } from "./manual-stat-widget";
 import { InteractiveStatWidget } from "./interactive-stat-widget";
+import { InfoSubmitTotalWidget } from "./info-submit-total-widget";
 import { SectionHeaderWidget } from "./section-header-widget";
 import { TopContentWidget } from "./top-content-widget";
 import { RecentContentWidget } from "./recent-content-widget";
@@ -22,6 +23,7 @@ import type { WidgetConfig } from "@/types/widget";
 const widgetComponents: Record<string, React.ComponentType<{ config: WidgetConfig }>> = {
   "stat": StatWidget,
   "interactive-stat": InteractiveStatWidget,
+  "info-submit-total": InfoSubmitTotalWidget,
   "manual-stat": ManualStatWidget,
   "line-chart": ChartWidget,
   "bar-chart": ChartWidget,
