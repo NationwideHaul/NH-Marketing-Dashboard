@@ -1,108 +1,87 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCRMSummary, brandForAccount } from "@/lib/api-clients/nationwide-haul-crm";
-import { normalizeCRMSource } from "@/lib/crm-source-normalize";
-import { format, subMonths, startOfMonth, endOfMonth, parseISO, differenceInCalendarMonths } from "date-fns";
+import { brandForAccount } from "@/lib/api-clients/nationwide-haul-crm";
+import { getCrmSupabase, leadSourceToPlatform } from "@/lib/supabase-crm";
+import { format, subMonths, parseISO, eachMonthOfInterval } from "date-fns";
 
 /**
- * Maps canonical CRM lead source names (see normalizeCRMSource) → inventory
- * platform names. Sources are normalized before lookup, so only canonical keys
- * are needed here.
- */
-const SOURCE_TO_PLATFORM: Record<string, string> = {
-  "TruckPaper": "TruckPaper",
-  "Commercial Truck Trader": "Commercial Truck Trader",
-  "My Little Salesman": "My Little Salesman",
-  "Cherry Trader": "Cherry Trader",
-  "Nationwide Haul Website": "NH Website",
-  "FormSubmit": "NH Website",
-  "CognitoForms": "NH Website",
-  "Rentalyard": "Rentalyard",
-  "RitchieList": "RitchieList",
-  // NFI Truck Sales website
-  "NFI Website": "NFI Website",
-};
-
-// Brand-specific source→platform overrides, applied before SOURCE_TO_PLATFORM.
-// On the NFI account, the embedded Cognito form on nfitrucksales.com is NFI's
-// own website lead source: submissions route through the marketing inbox and the
-// CRM lead-routing tags them "CognitoForms". For NFI those belong to the
-// "NFI Website" platform, not the shared "NH Website" bucket.
-const BRAND_SOURCE_OVERRIDES: Record<string, Record<string, string>> = {
-  "nfi-truck-sales": {
-    "CognitoForms": "NFI Website",
-  },
-};
-
-/**
- * GET /api/inventory-platform-leads?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+ * GET /api/inventory-platform-leads?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&accountId=...
  *
- * Fetches CRM lead data per month and maps bySource to inventory platform names.
+ * Reads info-submit counts per inventory platform DIRECTLY from the CRM's
+ * Supabase, using the clean attribution columns:
+ *   - deals.brand     → which line of business (NFI vs NH)
+ *   - deals.channel    → 'info-submit' is the true "info submit" axis
+ *   - contacts.lead_source → the clean first-touch source ("nfi-website", …)
+ *
+ * This replaces the old path through the CRM's /api/marketing/summary endpoint,
+ * which reported the stale raw email_leads.parsed_data.source_platform field and
+ * never exposed channel. Returns monthly buckets of { platform: count }.
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const endDateStr = searchParams.get("endDate") || format(new Date(), "yyyy-MM-dd");
   const startDateStr = searchParams.get("startDate") || format(subMonths(new Date(), 6), "yyyy-MM-dd");
-  // Filter info submits to the account's brand (NFI gets only NFI-tagged leads).
   const brand = brandForAccount(searchParams.get("accountId"));
 
-  if (!process.env.NH_CRM_API_KEY) {
-    return NextResponse.json({ status: "error", message: "NH_CRM_API_KEY not configured.", data: null });
+  const supabase = getCrmSupabase();
+  if (!supabase) {
+    return NextResponse.json({ status: "error", message: "CRM Supabase not configured.", data: null });
+  }
+  if (!brand) {
+    // Only NFI / NH segment by brand; nothing to read for other accounts.
+    return NextResponse.json({ status: "live", data: [] });
   }
 
   try {
     const startDate = parseISO(startDateStr);
     const endDate = parseISO(endDateStr);
-    const monthSpan = Math.max(differenceInCalendarMonths(endDate, startDate), 0) + 1;
-    const monthCount = Math.min(monthSpan, 12);
 
-    const monthRanges = Array.from({ length: monthCount }, (_, i) => {
-      const monthDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
+    // Pull every info-submit deal for this brand in range, with its contact's
+    // clean lead source. One query, then bucket by month in JS.
+    const { data, error } = await supabase
+      .from("deals")
+      .select("created_at, contact:contacts(lead_source)")
+      .eq("brand", brand)
+      .eq("channel", "info-submit")
+      .gte("created_at", `${startDateStr}T00:00:00Z`)
+      .lte("created_at", `${endDateStr}T23:59:59Z`);
+
+    if (error) throw new Error(error.message);
+
+    // monthKey (yyyy-MM) → { platform: count }
+    const byMonth: Record<string, Record<string, number>> = {};
+    const debug = searchParams.get("debug") === "1";
+    const sourcesSeen: Record<string, number> = {};
+
+    for (const row of (data ?? []) as Array<{ created_at: string; contact: { lead_source: string | null } | { lead_source: string | null }[] | null }>) {
+      const c = Array.isArray(row.contact) ? row.contact[0] : row.contact;
+      const slug = c?.lead_source ?? null;
+      if (debug && slug) sourcesSeen[slug] = (sourcesSeen[slug] || 0) + 1;
+      const platform = leadSourceToPlatform(slug);
+      if (!platform) continue;
+      const monthKey = (row.created_at || "").slice(0, 7); // yyyy-MM
+      if (!monthKey) continue;
+      (byMonth[monthKey] ??= {})[platform] = (byMonth[monthKey][platform] ?? 0) + 1;
+    }
+
+    // Emit one entry per calendar month in range (so the chart has stable buckets).
+    const months = eachMonthOfInterval({ start: startDate, end: endDate });
+    const result = months.map((m) => {
+      const monthKey = format(m, "yyyy-MM");
       return {
-        start: format(startOfMonth(monthDate), "yyyy-MM-dd"),
-        end: format(endOfMonth(monthDate), "yyyy-MM-dd"),
-        monthLabel: format(monthDate, "MMM yy"),
-        monthKey: format(monthDate, "yyyy-MM"),
+        month: format(m, "MMM yy"),
+        monthKey,
+        byPlatform: byMonth[monthKey] ?? {},
       };
     });
 
-    const debug = searchParams.get("debug") === "1";
-    const typesSeen: Record<string, number> = {};
-    const sourcesSeen: Record<string, number> = {};
-
-    const apiResults = await Promise.all(
-      monthRanges.map(async ({ start, end, monthLabel, monthKey }) => {
-        try {
-          const data = await getCRMSummary(start, end, brand);
-          if (debug) {
-            for (const [t, c] of Object.entries(data.leads.byType || {})) {
-              typesSeen[t] = (typesSeen[t] || 0) + c;
-            }
-            for (const [s, c] of Object.entries(data.leads.bySource || {})) {
-              sourcesSeen[s] = (sourcesSeen[s] || 0) + c;
-            }
-          }
-          const byPlatform: Record<string, number> = {};
-          const brandOverrides = brand ? BRAND_SOURCE_OVERRIDES[brand] : undefined;
-          for (const [source, count] of Object.entries(data.leads.bySource)) {
-            const canonical = normalizeCRMSource(source);
-            const platform = brandOverrides?.[canonical] ?? SOURCE_TO_PLATFORM[canonical];
-            if (platform) byPlatform[platform] = (byPlatform[platform] || 0) + count;
-          }
-          return { month: monthLabel, monthKey, byPlatform };
-        } catch {
-          return { month: monthLabel, monthKey, byPlatform: {} };
-        }
-      }),
-    );
-
     return NextResponse.json({
       status: "live",
-      data: apiResults,
-      ...(debug ? { debug: { typesSeen, sourcesSeen } } : {}),
+      data: result,
+      ...(debug ? { debug: { sourcesSeen } } : {}),
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("Inventory platform leads error:", message);
+    console.error("Inventory platform leads (CRM direct) error:", message);
     return NextResponse.json({ status: "error", error: message, data: null }, { status: 500 });
   }
 }
