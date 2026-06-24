@@ -4,7 +4,7 @@ import useSWR from "swr";
 import { useState, useEffect } from "react";
 import { useDateRange } from "@/context/date-range-context";
 import { useAccount } from "@/context/account-context";
-import { format, differenceInDays, subDays, eachMonthOfInterval } from "date-fns";
+import { format, differenceInDays, subDays, eachMonthOfInterval, startOfYear } from "date-fns";
 import type { WidgetConfig } from "@/types/widget";
 import type { KPIMetric } from "@/types/kpi";
 
@@ -159,13 +159,20 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
 export function useWidgetTimeSeries(config: WidgetConfig): { date: string; value: number }[] {
   const { dateRange } = useDateRange();
   const { apiAccountId } = useAccount();
-  // Use the user's selected date range for charts.
-  // Only override if config.trendMonths is explicitly set.
-  const effectiveStart = config.trendMonths
+  // Use the user's selected date range for charts, with two opt-outs:
+  // - config.yearToDate: always show Jan 1 of the current year → today, so the
+  //   chart stays a fixed month-by-month view of the year as it progresses,
+  //   independent of the global date selector.
+  // - config.trendMonths: show a rolling window of N months back from today.
+  const today = new Date();
+  const effectiveStart = config.yearToDate
+    ? startOfYear(today)
+    : config.trendMonths
     ? subDays(dateRange.to, config.trendMonths * 30)
     : dateRange.from;
+  const effectiveEnd = config.yearToDate ? today : dateRange.to;
   const startDate = format(effectiveStart, "yyyy-MM-dd");
-  const endDate = format(dateRange.to, "yyyy-MM-dd");
+  const endDate = format(effectiveEnd, "yyyy-MM-dd");
   const route = getApiRoute(config.dataSource);
   const sep = route.includes("?") ? "&" : "?";
   const dimensionParam = config.dimension ? `&dimension=${config.dimension}` : "";

@@ -52,7 +52,7 @@ export const gaDefaults: PageDefault = {
     { id: "ga-3", type: "stat", title: "Page Views", dataSource: "google-analytics", metric: "pageViews", format: "number", comparisonEnabled: true },
     { id: "ga-4", type: "stat", title: "Bounce Rate", dataSource: "google-analytics", metric: "bounceRate", format: "percent", comparisonEnabled: true },
     // Row 2: Traffic over time + Users by channel
-    { id: "ga-5", type: "area-chart", title: "Traffic Over Time", dataSource: "google-analytics", metric: "sessions", format: "number" },
+    { id: "ga-5", type: "area-chart", title: "Traffic Over Time", dataSource: "google-analytics", metric: "sessions", format: "number", yearToDate: true },
     { id: "ga-6", type: "bar-chart", title: "Users by Channel", dataSource: "google-analytics", metric: "users", format: "number", dimension: "sessionDefaultChannelGroup" },
     // Row 3: Search/Organic/Paid
     { id: "ga-7", type: "stat", title: "Organic Traffic", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true, dimension: "sessionDefaultChannelGroup", dimensionValue: "Organic Search" },
@@ -61,7 +61,7 @@ export const gaDefaults: PageDefault = {
     { id: "ga-9", type: "stat", title: "Avg. Session Duration", dataSource: "google-analytics", metric: "avgSessionDuration", format: "number", comparisonEnabled: true },
     // Row 4: Device + Engagement chart
     { id: "ga-10", type: "pie-chart", title: "Device Distribution", dataSource: "google-analytics", metric: "sessions", format: "number", dimension: "deviceCategory" },
-    { id: "ga-11", type: "line-chart", title: "Engagement Over Time", dataSource: "google-analytics", metric: "pageViews", format: "number" },
+    { id: "ga-11", type: "line-chart", title: "Engagement Over Time", dataSource: "google-analytics", metric: "pageViews", format: "number", yearToDate: true },
   ],
   layouts: {
     lg: [
@@ -88,8 +88,8 @@ export const gadsDefaults: PageDefault = {
     { id: "gads-3", type: "stat", title: "Average CPC", dataSource: "google-ads", metric: "cpc", format: "currency", comparisonEnabled: true },
     { id: "gads-4", type: "stat", title: "Impressions", dataSource: "google-ads", metric: "impressions", format: "number", comparisonEnabled: true },
     // Row 2: Charts
-    { id: "gads-5", type: "line-chart", title: "Clicks Over Time", dataSource: "google-ads", metric: "clicks", format: "number" },
-    { id: "gads-6", type: "area-chart", title: "Cost Over Time", dataSource: "google-ads", metric: "spend", format: "currency" },
+    { id: "gads-5", type: "line-chart", title: "Clicks Over Time", dataSource: "google-ads", metric: "clicks", format: "number", yearToDate: true },
+    { id: "gads-6", type: "area-chart", title: "Cost Over Time", dataSource: "google-ads", metric: "spend", format: "currency", yearToDate: true },
     // Row 3: More stats
     { id: "gads-7", type: "stat", title: "CTR", dataSource: "google-ads", metric: "ctr", format: "percent", comparisonEnabled: true },
     { id: "gads-8", type: "stat", title: "Cost Per Conversion", dataSource: "google-ads", metric: "costPerConversion", format: "currency", comparisonEnabled: true },
@@ -338,13 +338,13 @@ export const nfiOverviewDefaults: PageDefault = {
     { id: "nfi-12", type: "manual-stat", title: "Banner Ad Clicks (Truck Paper)", dataSource: "overview", metric: "bannerClicks", format: "number", manualValue: 0 },
     // Section: Trends Over Time
     { id: "nfi-sec", type: "section-header", title: "Trends Over Time", dataSource: "overview", metric: "none", format: "number", sectionTitle: "Trends Over Time" },
-    // Charts — 5 months of data for monthly comparison
-    { id: "nfi-13", type: "line-chart", title: "Website Traffic", dataSource: "google-analytics", metric: "sessions", format: "number", trendMonths: 5 },
-    { id: "nfi-14", type: "bar-chart", title: "PPC Clicks", dataSource: "google-ads", metric: "clicks", format: "number", trendMonths: 5 },
-    { id: "nfi-15", type: "line-chart", title: "PPC Conversions", dataSource: "google-ads", metric: "conversions", format: "number", trendMonths: 5 },
-    { id: "nfi-16", type: "line-chart", title: "PPC Cost Per Click", dataSource: "google-ads", metric: "cpc", format: "currency", trendMonths: 5 },
-    { id: "nfi-17", type: "area-chart", title: "Total Phone Calls", dataSource: "callrail", metric: "totalCalls", format: "number", trendMonths: 5 },
-    { id: "nfi-18", type: "bar-chart", title: "Email Opens", dataSource: "email-marketing", metric: "emailsSent", format: "number", trendMonths: 5 },
+    // Charts — fixed year-to-date (Jan 1 → today) for month-by-month comparison
+    { id: "nfi-13", type: "line-chart", title: "Website Traffic", dataSource: "google-analytics", metric: "sessions", format: "number", yearToDate: true },
+    { id: "nfi-14", type: "bar-chart", title: "PPC Clicks", dataSource: "google-ads", metric: "clicks", format: "number", yearToDate: true },
+    { id: "nfi-15", type: "line-chart", title: "PPC Conversions", dataSource: "google-ads", metric: "conversions", format: "number", yearToDate: true },
+    { id: "nfi-16", type: "line-chart", title: "PPC Cost Per Click", dataSource: "google-ads", metric: "cpc", format: "currency", yearToDate: true },
+    { id: "nfi-17", type: "area-chart", title: "Total Phone Calls", dataSource: "callrail", metric: "totalCalls", format: "number", yearToDate: true },
+    { id: "nfi-18", type: "bar-chart", title: "Email Opens", dataSource: "email-marketing", metric: "emailsSent", format: "number", yearToDate: true },
   ],
   layouts: {
     lg: [
@@ -386,13 +386,13 @@ export const nhOverviewDefaults: PageDefault = {
     { id: "nh-6", type: "bar-chart", title: "Conversion Rate Per Source", dataSource: "google-analytics", metric: "conversions", format: "number", dimension: "sessionDefaultChannelGroup" },
     // Section: Trends Over Time
     { id: "nh-sec", type: "section-header", title: "Trends Over Time", dataSource: "overview", metric: "none", format: "number", sectionTitle: "Trends Over Time" },
-    // Trend charts (5 months)
-    { id: "nh-c1", type: "line-chart", title: "Website Traffic", dataSource: "google-analytics", metric: "sessions", format: "number", trendMonths: 5 },
-    { id: "nh-c2", type: "area-chart", title: "Phone Calls", dataSource: "callrail", metric: "totalCalls", format: "number", trendMonths: 5 },
-    { id: "nh-c3", type: "line-chart", title: "Info Submits", dataSource: "overview", metric: "infoSubmits", format: "number", trendMonths: 5 },
-    { id: "nh-c4", type: "bar-chart", title: "PPC Clicks", dataSource: "google-ads", metric: "clicks", format: "number", trendMonths: 5 },
-    { id: "nh-c5", type: "bar-chart", title: "Social Media Engagement", dataSource: "overview", metric: "socialEngagement", format: "number", trendMonths: 5 },
-    { id: "nh-c6", type: "line-chart", title: "Conversion Rate Trend", dataSource: "overview", metric: "conversionRate", format: "percent", trendMonths: 5 },
+    // Trend charts — fixed year-to-date (Jan 1 → today) for month-by-month comparison
+    { id: "nh-c1", type: "line-chart", title: "Website Traffic", dataSource: "google-analytics", metric: "sessions", format: "number", yearToDate: true },
+    { id: "nh-c2", type: "area-chart", title: "Phone Calls", dataSource: "callrail", metric: "totalCalls", format: "number", yearToDate: true },
+    { id: "nh-c3", type: "line-chart", title: "Info Submits", dataSource: "overview", metric: "infoSubmits", format: "number", yearToDate: true },
+    { id: "nh-c4", type: "bar-chart", title: "PPC Clicks", dataSource: "google-ads", metric: "clicks", format: "number", yearToDate: true },
+    { id: "nh-c5", type: "bar-chart", title: "Social Media Engagement", dataSource: "overview", metric: "socialEngagement", format: "number", yearToDate: true },
+    { id: "nh-c6", type: "line-chart", title: "Conversion Rate Trend", dataSource: "overview", metric: "conversionRate", format: "percent", yearToDate: true },
   ],
   layouts: {
     lg: [
