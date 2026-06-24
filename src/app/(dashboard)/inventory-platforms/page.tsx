@@ -51,9 +51,22 @@ function trackerToPlatform(trackerName: string): string | null {
 /*  Hooks: fetch CRM info submits + CallRail calls                    */
 /* ------------------------------------------------------------------ */
 
+interface MonthBucket {
+  monthKey: string; // "YYYY-MM"
+  monthLabel: string; // "MMM yy"
+  byPlatform: Record<string, { calls: number; infoSubmits: number }>;
+}
+
 interface LivePlatformData {
-  infoSubmits: Record<string, number>;
-  calls: Record<string, number>;
+  infoSubmits: Record<string, number>; // range totals per platform
+  calls: Record<string, number>;       // range totals per platform
+  monthly: MonthBucket[];              // per-month, per-platform calls + info submits
+}
+
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function monthLabelFromKey(key: string): string {
+  const [y, m] = key.split("-");
+  return `${MONTH_NAMES[parseInt(m, 10) - 1] || m} ${(y || "").slice(2)}`;
 }
 
 function useLivePlatformData(
@@ -66,11 +79,8 @@ function useLivePlatformData(
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // NH pulls info submits from the NH Sales CRM + calls from CallRail.
-    // NHTTR pulls ONLY calls from CallRail (per-platform); its info submits
-    // come from GA4 website forms and are shown as a single top-level stat.
-    // NFI pulls calls from CallRail (per tracker) + info submits from the CRM
-    // filtered to the "NFI Truck Sales" deal tag (via accountId on the route).
+    // NH/NFI pull info submits from the Sales CRM (channel=info-submit, by lead
+    // source) + calls from CallRail. NHTTR pulls ONLY calls from CallRail.
     const supported =
       accountId === "nationwide-haul" ||
       accountId === "nhttr" ||
@@ -85,38 +95,57 @@ function useLivePlatformData(
           .then((r) => r.json())
           .catch(() => null)
       : Promise.resolve(null);
-    const callPromise = fetch(`/api/callrail?startDate=${startDate}&endDate=${endDate}&accountId=${accountId}`)
+    // Raw calls (not the summary) so we can bucket by month + tracker.
+    const callPromise = fetch(`/api/callrail?type=calls&startDate=${startDate}&endDate=${endDate}&accountId=${accountId}`)
       .then((r) => r.json())
       .catch(() => null);
 
     Promise.all([crmPromise, callPromise]).then(([crmRes, callRes]) => {
       if (cancelled) return;
 
+      const months = new Map<string, MonthBucket>();
+      const ensureMonth = (key: string, label: string) => {
+        let b = months.get(key);
+        if (!b) { b = { monthKey: key, monthLabel: label, byPlatform: {} }; months.set(key, b); }
+        return b;
+      };
+      const ensurePlat = (b: MonthBucket, plat: string) => {
+        if (!b.byPlatform[plat]) b.byPlatform[plat] = { calls: 0, infoSubmits: 0 };
+        return b.byPlatform[plat];
+      };
+
+      // Info submits per month per platform (CRM returns one entry per month).
       const infoSubmits: Record<string, number> = {};
-      if (crmRes?.status === "live" && crmRes.data) {
+      if (crmRes?.status === "live" && Array.isArray(crmRes.data)) {
         for (const entry of crmRes.data) {
+          const key = entry.monthKey || (entry.month ?? "");
+          const bucket = ensureMonth(key, entry.month || monthLabelFromKey(key));
           const byPlatform = entry.byPlatform || entry.infoSubmitsByPlatform || {};
           for (const [platform, count] of Object.entries(byPlatform)) {
             infoSubmits[platform] = (infoSubmits[platform] || 0) + (count as number);
+            ensurePlat(bucket, platform).infoSubmits += count as number;
           }
         }
       }
 
-      // Map CallRail tracker breakdown to platforms. Prefer the per-platform
-      // `trackerName` configured in inventory-platforms-data.ts; fall back to
-      // the legacy TRACKER_TO_PLATFORM pattern list for NH's tracker names.
+      // Calls per month per platform, from raw CallRail calls (source_name +
+      // start_time). Match each call's source to a platform the same way the
+      // tracker breakdown does.
       const calls: Record<string, number> = {};
-      if (callRes?.status === "live" && callRes.data?.trackerBreakdown) {
-        for (const { tracker, count } of callRes.data.trackerBreakdown) {
-          const direct = platforms.find((p) => p.trackerName && tracker.includes(p.trackerName));
-          const platformName = direct?.name ?? trackerToPlatform(tracker);
-          if (platformName) {
-            calls[platformName] = (calls[platformName] || 0) + count;
-          }
-        }
+      const rawCalls = callRes?.status === "live" ? (callRes.data?.calls ?? []) : [];
+      for (const call of rawCalls) {
+        const src: string = call.source_name || "";
+        const direct = platforms.find((p) => p.trackerName && src.includes(p.trackerName));
+        const platformName = direct?.name ?? trackerToPlatform(src);
+        if (!platformName) continue;
+        calls[platformName] = (calls[platformName] || 0) + 1;
+        const key = String(call.start_time || call.created_at || "").slice(0, 7);
+        if (!/^\d{4}-\d{2}$/.test(key)) continue;
+        ensurePlat(ensureMonth(key, monthLabelFromKey(key)), platformName).calls += 1;
       }
 
-      setData({ infoSubmits, calls });
+      const monthly = Array.from(months.values()).sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+      setData({ infoSubmits, calls, monthly });
     }).finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
@@ -183,7 +212,7 @@ function daysUntilRenewal(renewalDate?: string): number | null {
 }
 
 // NHTTR-style view: calls per platform, expandable chart, editable budget, comparison table
-function NHTTRPlatformView({ platforms: rawPlatforms }: { platforms: PlatformData[] }) {
+function NHTTRPlatformView({ platforms: rawPlatforms, monthly }: { platforms: PlatformData[]; monthly: MonthBucket[] }) {
   const { currentAccount } = useAccount();
 
   // Load persistent annual cost + renewal date overrides from localStorage
@@ -236,16 +265,17 @@ function NHTTRPlatformView({ platforms: rawPlatforms }: { platforms: PlatformDat
     return p.monthlyData[p.monthlyData.length - 2].calls;
   }
 
-  // Comparison data for all platforms
-  const comparisonData = platforms[0]?.monthlyData.length
-    ? platforms[0].monthlyData.map((_, i) => {
-        const entry: any = { month: platforms[0].monthlyData[i].month }; // eslint-disable-line @typescript-eslint/no-explicit-any
-        platforms.forEach((p) => { entry[p.name] = p.monthlyData[i]?.calls || 0; });
-        return entry;
-      })
-    : [];
+  // Month-over-month calls per platform from real CallRail data.
+  const comparisonData = monthly.map((m) => {
+    const entry: any = { month: m.monthLabel }; // eslint-disable-line @typescript-eslint/no-explicit-any
+    platforms.forEach((p) => { entry[p.name] = m.byPlatform[p.name]?.calls || 0; });
+    return entry;
+  });
 
   const detail = selectedPlatform ? platforms.find((p) => p.name === selectedPlatform) : null;
+  const detailMonthly = detail
+    ? monthly.map((m) => ({ month: m.monthLabel, calls: m.byPlatform[detail.name]?.calls || 0 }))
+    : [];
 
   return (
     <div>
@@ -381,12 +411,12 @@ function NHTTRPlatformView({ platforms: rawPlatforms }: { platforms: PlatformDat
       </div>
 
       {/* Expanded Chart -- shows when a platform is selected */}
-      {detail && detail.monthlyData.length > 0 && (
+      {detail && detailMonthly.length > 0 && (
         <div className="rounded-lg border border-primary/20 bg-card p-4 mb-4">
           <h3 className="text-sm font-bold text-card-foreground mb-3">{detail.fullName} -- Calls Over Time</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={detail.monthlyData}>
+              <BarChart data={detailMonthly}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} />
@@ -514,33 +544,43 @@ function NHTTRPlatformView({ platforms: rawPlatforms }: { platforms: PlatformDat
 }
 
 // Full platform view with charts and comparison (for NH/NFI)
-function FullPlatformView({ platforms }: { platforms: PlatformData[] }) {
+function FullPlatformView({ platforms, monthly }: { platforms: PlatformData[]; monthly: MonthBucket[] }) {
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const hasData = platforms.some((p) => p.monthlyData.length > 0);
   const roiRanking = hasData ? getROIScores(platforms) : [];
   const bestPerformer = roiRanking[0];
   const worstPerformer = roiRanking[roiRanking.length - 1];
 
-  const comparisonData = hasData && platforms[0].monthlyData.length > 0
-    ? platforms[0].monthlyData.map((_, i) => {
-        const entry: any = { month: platforms[0].monthlyData[i].month }; // eslint-disable-line @typescript-eslint/no-explicit-any
-        platforms.forEach((p) => { entry[p.name] = p.monthlyData[i]?.leads || 0; });
-        return entry;
-      })
-    : [];
+  // Month-over-month trends from real CRM (info submits) + CallRail (calls) data.
+  // Leads = calls + info submits per platform per month.
+  const comparisonData = monthly.map((m) => {
+    const entry: any = { month: m.monthLabel }; // eslint-disable-line @typescript-eslint/no-explicit-any
+    platforms.forEach((p) => {
+      const d = m.byPlatform[p.name];
+      entry[p.name] = d ? d.calls + d.infoSubmits : 0;
+    });
+    return entry;
+  });
 
-  const cplComparisonData = hasData && platforms[0].monthlyData.length > 0
-    ? platforms[0].monthlyData.map((_, i) => {
-        const entry: any = { month: platforms[0].monthlyData[i].month }; // eslint-disable-line @typescript-eslint/no-explicit-any
-        platforms.forEach((p) => {
-          const d = p.monthlyData[i];
-          entry[p.name] = d && d.leads > 0 ? Math.round((d.price / d.leads) * 100) / 100 : 0;
-        });
-        return entry;
-      })
-    : [];
+  const cplComparisonData = monthly.map((m) => {
+    const entry: any = { month: m.monthLabel }; // eslint-disable-line @typescript-eslint/no-explicit-any
+    platforms.forEach((p) => {
+      const d = m.byPlatform[p.name];
+      const leads = d ? d.calls + d.infoSubmits : 0;
+      entry[p.name] = leads > 0 ? Math.round((p.pricePerMonth / leads) * 100) / 100 : 0;
+    });
+    return entry;
+  });
 
   const detail = selectedPlatform ? platforms.find((p) => p.name === selectedPlatform) : null;
+  const detailMonthly = detail
+    ? monthly.map((m) => {
+        const d = m.byPlatform[detail.name];
+        const calls = d?.calls || 0;
+        const infoSubmits = d?.infoSubmits || 0;
+        return { month: m.monthLabel, calls, infoSubmits, leads: calls + infoSubmits };
+      })
+    : [];
 
   if (!hasData) {
     return (
@@ -612,14 +652,14 @@ function FullPlatformView({ platforms }: { platforms: PlatformData[] }) {
       </div>
 
       {/* Platform Detail */}
-      {detail && detail.monthlyData.length > 0 && (
+      {detail && detailMonthly.length > 0 && (
         <div className="rounded-lg border border-primary/20 bg-card p-4 mb-4">
           <h3 className="text-sm font-bold text-card-foreground mb-3">{detail.fullName} -- Monthly Trend</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="h-64">
               <p className="text-xs text-muted-foreground mb-2">Leads Over Time</p>
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={detail.monthlyData}>
+                <AreaChart data={detailMonthly}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
@@ -631,7 +671,7 @@ function FullPlatformView({ platforms }: { platforms: PlatformData[] }) {
             <div className="h-64">
               <p className="text-xs text-muted-foreground mb-2">Calls vs Info Submits</p>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={detail.monthlyData}>
+                <BarChart data={detailMonthly}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
@@ -797,9 +837,9 @@ export default function InventoryPlatformsPage() {
       </div>
 
       {isNHTTR ? (
-        <NHTTRPlatformView platforms={platforms} />
+        <NHTTRPlatformView platforms={platforms} monthly={liveData?.monthly ?? []} />
       ) : (
-        <FullPlatformView platforms={platforms} />
+        <FullPlatformView platforms={platforms} monthly={liveData?.monthly ?? []} />
       )}
     </div>
   );
