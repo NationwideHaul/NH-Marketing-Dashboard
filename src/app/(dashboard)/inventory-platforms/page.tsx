@@ -10,9 +10,9 @@ import { formatCurrency, formatNumber } from "@/lib/utils";
 import { DataSourceBadge } from "@/components/layout/data-source-badge";
 import { externalLinks } from "@/lib/external-links";
 import { useAccount } from "@/context/account-context";
-import { useDateRange } from "@/context/date-range-context";
+import { useBudget } from "@/context/budget-context";
 import { getPlatformsForAccount, type PlatformData } from "@/lib/inventory-platforms-data";
-import { format as fmtDate, differenceInDays, parseISO } from "date-fns";
+import { format as fmtDate, differenceInDays, parseISO, startOfMonth } from "date-fns";
 
 /* ------------------------------------------------------------------ */
 /*  Hook: fetch live CRM info-submit data per platform per month      */
@@ -749,17 +749,30 @@ function FullPlatformView({ platforms }: { platforms: PlatformData[] }) {
 
 export default function InventoryPlatformsPage() {
   const { currentAccount } = useAccount();
-  const { dateRange } = useDateRange();
+  const { platformCost } = useBudget();
   const staticPlatforms = getPlatformsForAccount(currentAccount.id);
   const isNHTTR = currentAccount.id === "nhttr";
-  const startStr = fmtDate(dateRange.from, "yyyy-MM-dd");
-  const endStr = fmtDate(dateRange.to, "yyyy-MM-dd");
+  // The monthly comparison charts are a fixed month-by-month view of the year,
+  // so they intentionally ignore the global date selector. The live "current
+  // month" bucket always covers the start of the current month → today.
+  const today = new Date();
+  const startStr = fmtDate(startOfMonth(today), "yyyy-MM-dd");
+  const endStr = fmtDate(today, "yyyy-MM-dd");
   const { data: liveData, loading } = useLivePlatformData(currentAccount.id, startStr, endStr, staticPlatforms);
 
-  // Merge live CRM + CallRail data into platform cards
+  // Merge live CRM + CallRail data into platform cards. Each platform's monthly
+  // cost comes from the shared Budget tab (when a matching row exists), so the
+  // cost-per-lead here reflects whatever budget the user maintains — edits on
+  // the Budget tab update these numbers live.
   const platforms = useMemo(
-    () => mergePlatformsWithLive(staticPlatforms, liveData),
-    [staticPlatforms, liveData],
+    () => {
+      const costed = staticPlatforms.map((p) => {
+        const cost = platformCost(p.name);
+        return cost !== undefined ? { ...p, pricePerMonth: cost } : p;
+      });
+      return mergePlatformsWithLive(costed, liveData);
+    },
+    [staticPlatforms, liveData, platformCost],
   );
 
   return (

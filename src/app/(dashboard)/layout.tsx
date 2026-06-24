@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/header";
 import { DateRangeProvider } from "@/context/date-range-context";
 import { DashboardProvider } from "@/context/dashboard-context";
 import { AccountProvider } from "@/context/account-context";
+import { BudgetProvider } from "@/context/budget-context";
 
 export default function DashboardLayout({
   children,
@@ -11,19 +12,21 @@ export default function DashboardLayout({
 }) {
   return (
     <AccountProvider>
-      <DateRangeProvider>
-        <DashboardProvider>
-          <div className="flex h-screen overflow-hidden">
-            <Sidebar />
-            <div className="flex flex-1 flex-col overflow-hidden">
-              <Header />
-              <main className="flex-1 overflow-y-auto bg-background p-4">
-                {children}
-              </main>
+      <BudgetProvider>
+        <DateRangeProvider>
+          <DashboardProvider>
+            <div className="flex h-screen overflow-hidden">
+              <Sidebar />
+              <div className="flex flex-1 flex-col overflow-hidden">
+                <Header />
+                <main className="flex-1 overflow-y-auto bg-background p-4">
+                  {children}
+                </main>
+              </div>
             </div>
-          </div>
-        </DashboardProvider>
-      </DateRangeProvider>
+          </DashboardProvider>
+        </DateRangeProvider>
+      </BudgetProvider>
     </AccountProvider>
   );
 }

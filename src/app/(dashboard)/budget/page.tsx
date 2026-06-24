@@ -12,70 +12,7 @@ import { DataSourceBadge } from "@/components/layout/data-source-badge";
 import { externalLinks } from "@/lib/external-links";
 import { useAccount } from "@/context/account-context";
 import { useDateRange } from "@/context/date-range-context";
-
-interface BudgetRow {
-  platform: string;
-  budget: number;
-  spent: number;
-  category: "advertising" | "platform" | "tools";
-}
-
-// Per-account default budgets
-const accountBudgets: Record<string, BudgetRow[]> = {
-  "nationwide-haul": [
-    { platform: "Google Ads", budget: 5000, spent: 0, category: "advertising" },
-    { platform: "Meta Ads", budget: 7500, spent: 0, category: "advertising" },
-    { platform: "TruckPaper", budget: 6800, spent: 6800, category: "platform" },
-    { platform: "My Little Salesman", budget: 895, spent: 895, category: "platform" },
-    { platform: "Commercial Truck Trader", budget: 1200, spent: 1200, category: "platform" },
-    { platform: "Cherry Trader", budget: 500, spent: 500, category: "platform" },
-    { platform: "NH Website", budget: 195, spent: 195, category: "platform" },
-    { platform: "Go High Level", budget: 297, spent: 297, category: "tools" },
-  ],
-  "nfi-truck-sales": [
-    { platform: "Google Ads", budget: 4000, spent: 0, category: "advertising" },
-    { platform: "TruckPaper", budget: 6800, spent: 6800, category: "platform" },
-    { platform: "My Little Salesman", budget: 895, spent: 895, category: "platform" },
-    { platform: "NFI Website", budget: 195, spent: 195, category: "platform" },
-    { platform: "NH Website", budget: 195, spent: 195, category: "platform" },
-    { platform: "Go High Level", budget: 297, spent: 297, category: "tools" },
-    { platform: "CallRail", budget: 145, spent: 145, category: "tools" },
-  ],
-  nhttr: [
-    // Monthly equivalents of annual listing platform fees (see inventory-platforms-data.ts)
-    { platform: "Google Ads (RV Repair)", budget: 2500, spent: 0, category: "advertising" },
-    { platform: "Google Ads (TTR)", budget: 2500, spent: 0, category: "advertising" },
-    { platform: "NTTS Listing", budget: 8, spent: 8, category: "platform" }, // $100/yr
-    { platform: "Find Truck Service", budget: 83, spent: 83, category: "platform" }, // $996/yr
-    { platform: "TruckDown", budget: 36, spent: 36, category: "platform" }, // $430/yr
-    { platform: "CallRail", budget: 145, spent: 145, category: "tools" },
-  ],
-  "road-ready": [
-    { platform: "Google Ads", budget: 3000, spent: 0, category: "advertising" },
-    { platform: "Meta Ads", budget: 2000, spent: 0, category: "advertising" },
-    { platform: "Website Hosting", budget: 99, spent: 99, category: "platform" },
-    { platform: "Go High Level", budget: 297, spent: 297, category: "tools" },
-    { platform: "Lead Gen Software", budget: 199, spent: 199, category: "tools" },
-  ],
-};
-
-function getStorageKey(accountId: string) {
-  return `nh-budget-${accountId}`;
-}
-
-function loadBudgets(accountId: string): BudgetRow[] {
-  if (typeof window === "undefined") return accountBudgets[accountId] || [];
-  const saved = localStorage.getItem(getStorageKey(accountId));
-  if (saved) {
-    try { return JSON.parse(saved); } catch { /* fall through */ }
-  }
-  return accountBudgets[accountId] || [];
-}
-
-function saveBudgets(accountId: string, budgets: BudgetRow[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(getStorageKey(accountId), JSON.stringify(budgets));
-}
+import { useBudget } from "@/context/budget-context";
 
 // Fetches live ad-spend totals for the selected date range so the budget table
 // can override its stored `spent` value on advertising rows with real numbers
@@ -157,11 +94,12 @@ export default function BudgetPage() {
   const COLORS = currentAccount.chartPalette;
   const positiveColor = currentAccount.positiveColor;
   const primary = currentAccount.colors.primary;
-  const [budgets, setBudgets] = useState<BudgetRow[]>([]);
+  // Budgets live in the shared BudgetProvider so edits here propagate to other
+  // tabs (e.g. Inventory Platforms cost-per-lead) in the same window.
+  const { budgets, setBudgets, resetToDefaults, loaded } = useBudget();
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editBudget, setEditBudget] = useState<string>("");
   const [editSpent, setEditSpent] = useState<string>("");
-  const [loaded, setLoaded] = useState(false);
 
   // Adding new row
   const [showAdd, setShowAdd] = useState(false);
@@ -170,18 +108,12 @@ export default function BudgetPage() {
   const [newSpent, setNewSpent] = useState("");
   const [newCategory, setNewCategory] = useState<"advertising" | "platform" | "tools">("advertising");
 
-  // Load budgets when account changes
+  // Reset transient edit UI when the account changes (budgets themselves are
+  // loaded + persisted by the BudgetProvider).
   useEffect(() => {
-    setBudgets(loadBudgets(currentAccount.id));
-    setLoaded(true);
     setEditingIdx(null);
     setShowAdd(false);
   }, [currentAccount.id]);
-
-  // Persist
-  useEffect(() => {
-    if (loaded) saveBudgets(currentAccount.id, budgets);
-  }, [budgets, loaded, currentAccount.id]);
 
   // Merge live ad-spend into the stored rows: advertising rows matching a
   // tracked platform (Google Ads, Meta Ads, NHTTR splits) get their `spent`
@@ -251,12 +183,6 @@ export default function BudgetPage() {
     setNewSpent("");
     setNewCategory("advertising");
     setShowAdd(false);
-  };
-
-  const resetToDefaults = () => {
-    const defaults = accountBudgets[currentAccount.id] || [];
-    setBudgets(defaults);
-    localStorage.removeItem(getStorageKey(currentAccount.id));
   };
 
   if (!loaded) return null;
