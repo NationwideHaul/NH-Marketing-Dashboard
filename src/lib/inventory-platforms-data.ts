@@ -211,6 +211,17 @@ const nfiPlatforms: PlatformData[] = [
     trackerName: "My Little Salesman",
     monthlyData: [],
   },
+  {
+    name: "Commercial Truck Trader",
+    fullName: "Commercial Truck Trader",
+    color: "#0EA5E9",
+    // Placeholder monthly cost — set the real NFI cost on the Budget tab and it
+    // overrides this here (shared budget store). NFI's largest CRM lead source.
+    pricePerMonth: 1200,
+    billingCycle: "monthly",
+    trackerName: "Commercial Truck Trader",
+    monthlyData: [],
+  },
 ];
 
 const accountPlatforms: Record<string, PlatformData[]> = {

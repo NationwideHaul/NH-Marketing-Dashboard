@@ -22,6 +22,17 @@ const SOURCE_TO_PLATFORM: Record<string, string> = {
   "NFI Website": "NFI Website",
 };
 
+// Brand-specific source→platform overrides, applied before SOURCE_TO_PLATFORM.
+// On the NFI account, the embedded Cognito form on nfitrucksales.com is NFI's
+// own website lead source: submissions route through the marketing inbox and the
+// CRM lead-routing tags them "CognitoForms". For NFI those belong to the
+// "NFI Website" platform, not the shared "NH Website" bucket.
+const BRAND_SOURCE_OVERRIDES: Record<string, Record<string, string>> = {
+  "nfi-truck-sales": {
+    "CognitoForms": "NFI Website",
+  },
+};
+
 /**
  * GET /api/inventory-platform-leads?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
  *
@@ -71,8 +82,10 @@ export async function GET(request: NextRequest) {
             }
           }
           const byPlatform: Record<string, number> = {};
+          const brandOverrides = brand ? BRAND_SOURCE_OVERRIDES[brand] : undefined;
           for (const [source, count] of Object.entries(data.leads.bySource)) {
-            const platform = SOURCE_TO_PLATFORM[normalizeCRMSource(source)];
+            const canonical = normalizeCRMSource(source);
+            const platform = brandOverrides?.[canonical] ?? SOURCE_TO_PLATFORM[canonical];
             if (platform) byPlatform[platform] = (byPlatform[platform] || 0) + count;
           }
           return { month: monthLabel, monthKey, byPlatform };
