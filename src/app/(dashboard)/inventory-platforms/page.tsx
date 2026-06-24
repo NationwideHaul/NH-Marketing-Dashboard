@@ -11,8 +11,9 @@ import { DataSourceBadge } from "@/components/layout/data-source-badge";
 import { externalLinks } from "@/lib/external-links";
 import { useAccount } from "@/context/account-context";
 import { useBudget } from "@/context/budget-context";
+import { useDateRange } from "@/context/date-range-context";
 import { getPlatformsForAccount, type PlatformData } from "@/lib/inventory-platforms-data";
-import { format as fmtDate, differenceInDays, parseISO, startOfMonth } from "date-fns";
+import { format as fmtDate, differenceInDays, parseISO } from "date-fns";
 
 /* ------------------------------------------------------------------ */
 /*  Hook: fetch live CRM info-submit data per platform per month      */
@@ -750,14 +751,13 @@ function FullPlatformView({ platforms }: { platforms: PlatformData[] }) {
 export default function InventoryPlatformsPage() {
   const { currentAccount } = useAccount();
   const { platformCost } = useBudget();
+  const { dateRange } = useDateRange();
   const staticPlatforms = getPlatformsForAccount(currentAccount.id);
   const isNHTTR = currentAccount.id === "nhttr";
-  // The monthly comparison charts are a fixed month-by-month view of the year,
-  // so they intentionally ignore the global date selector. The live "current
-  // month" bucket always covers the start of the current month → today.
-  const today = new Date();
-  const startStr = fmtDate(startOfMonth(today), "yyyy-MM-dd");
-  const endStr = fmtDate(today, "yyyy-MM-dd");
+  // Per-platform info-submits/calls follow the global date selector, like the
+  // CRM Leads and Overview tabs — the totals reflect whatever range is picked.
+  const startStr = fmtDate(dateRange.from, "yyyy-MM-dd");
+  const endStr = fmtDate(dateRange.to, "yyyy-MM-dd");
   const { data: liveData, loading } = useLivePlatformData(currentAccount.id, startStr, endStr, staticPlatforms);
 
   // Merge live CRM + CallRail data into platform cards. Each platform's monthly
