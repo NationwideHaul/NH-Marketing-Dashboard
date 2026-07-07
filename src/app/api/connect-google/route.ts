@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { google } from "googleapis";
 
 export async function GET() {
+  const baseUrl = (process.env.NEXTAUTH_URL || "https://marketing.nationwidehaul.com").replace(/\/$/, "");
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    "https://nh-marketing-theta.vercel.app/api/connect-google/callback"
+    `${baseUrl}/api/connect-google/callback`
   );
 
   const url = oauth2Client.generateAuthUrl({

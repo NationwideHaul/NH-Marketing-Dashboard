@@ -6,10 +6,11 @@ import { google } from "googleapis";
 // refresh token captured here goes into YOUTUBE_REFRESH_TOKEN in Vercel,
 // independent of the main GOOGLE_REFRESH_TOKEN used for GA / Ads / GMB.
 export async function GET() {
+  const baseUrl = (process.env.NEXTAUTH_URL || "https://marketing.nationwidehaul.com").replace(/\/$/, "");
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    "https://nh-marketing-theta.vercel.app/api/connect-google/callback?which=youtube"
+    `${baseUrl}/api/connect-google/callback?which=youtube`
   );
 
   const url = oauth2Client.generateAuthUrl({

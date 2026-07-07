@@ -5,10 +5,11 @@ export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   if (!code) return NextResponse.json({ error: "No code provided" }, { status: 400 });
 
+  const baseUrl = (process.env.NEXTAUTH_URL || "https://marketing.nationwidehaul.com").replace(/\/$/, "");
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    "https://nh-marketing-theta.vercel.app/api/connect-youtube/callback"
+    `${baseUrl}/api/connect-youtube/callback`
   );
 
   try {

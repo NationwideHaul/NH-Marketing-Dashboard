@@ -3,7 +3,7 @@
 
 import { getCredential } from "@/lib/credential-store";
 
-const CRM_BASE_URL = "https://crm-nh.vercel.app/api/marketing";
+const CRM_BASE_URL = (process.env.NH_CRM_BASE_URL || "https://crm.nationwidehaul.com").replace(/\/$/, "") + "/api/marketing";
 
 export interface CRMSummaryResponse {
   period: { start: string; end: string; days: number };
