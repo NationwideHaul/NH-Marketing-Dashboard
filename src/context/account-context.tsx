@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
-import { accounts, getDefaultAccount, type SubAccount } from "@/lib/accounts";
+import { usePathname, useRouter } from "next/navigation";
+import { accounts, getDefaultAccount, allTabs, type SubAccount } from "@/lib/accounts";
 
 interface AccountContextType {
   currentAccount: SubAccount;
@@ -18,26 +19,44 @@ const STORAGE_KEY = "nh-current-account";
 
 const SUB_SERVICE_KEY = "nh-sub-service";
 
+// Keep the current account/sub-service reflected in the URL so views are
+// shareable and survive refreshes, without adding history entries.
+function syncUrlParams(accountId: string, subId: string | null) {
+  const url = new URL(window.location.href);
+  if (url.searchParams.get("account") === accountId && url.searchParams.get("sub") === subId) return;
+  url.searchParams.set("account", accountId);
+  if (subId) url.searchParams.set("sub", subId);
+  else url.searchParams.delete("sub");
+  window.history.replaceState(window.history.state, "", url);
+}
+
 export function AccountProvider({ children }: { children: ReactNode }) {
   const [currentAccount, setCurrentAccount] = useState<SubAccount>(getDefaultAccount());
   const [activeSubService, setActiveSubServiceState] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
-    const savedId = localStorage.getItem(STORAGE_KEY);
-    if (savedId) {
-      const found = accounts.find((a) => a.id === savedId);
-      if (found) {
-        setCurrentAccount(found);
-        // Load saved sub-service for this account
-        if (found.subServices?.length) {
-          const savedSub = localStorage.getItem(`${SUB_SERVICE_KEY}-${found.id}`);
-          setActiveSubServiceState(savedSub || found.subServices[0].id);
-        }
-      }
+    // URL param wins (shared/bookmarked links), then last-used from localStorage
+    const params = new URLSearchParams(window.location.search);
+    const requestedId = params.get("account") || localStorage.getItem(STORAGE_KEY);
+    const found = (requestedId && accounts.find((a) => a.id === requestedId)) || getDefaultAccount();
+    setCurrentAccount(found);
+    localStorage.setItem(STORAGE_KEY, found.id);
+    if (found.subServices?.length) {
+      const requestedSub = params.get("sub") || localStorage.getItem(`${SUB_SERVICE_KEY}-${found.id}`);
+      const validSub = found.subServices.find((s) => s.id === requestedSub)?.id || found.subServices[0].id;
+      setActiveSubServiceState(validSub);
     }
     setLoaded(true);
   }, []);
+
+  // Re-stamp the URL params after every navigation and account/sub change
+  useEffect(() => {
+    if (!loaded) return;
+    syncUrlParams(currentAccount.id, activeSubService);
+  }, [loaded, pathname, currentAccount, activeSubService]);
 
   const setAccount = (id: string) => {
     const found = accounts.find((a) => a.id === id);
@@ -50,6 +69,11 @@ export function AccountProvider({ children }: { children: ReactNode }) {
         setActiveSubServiceState(savedSub || found.subServices[0].id);
       } else {
         setActiveSubServiceState(null);
+      }
+      // If the new account doesn't have the tab we're on, go to Overview
+      const currentTab = allTabs.find((t) => t.href !== "/" && pathname.startsWith(t.href));
+      if (currentTab && !found.tabs.includes(currentTab.id)) {
+        router.push("/");
       }
     }
   };
