@@ -48,13 +48,30 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        const email = credentials?.email as string;
+        const email = (credentials?.email as string)?.trim().toLowerCase();
         const password = credentials?.password as string;
-        if (
-          email === process.env.DASHBOARD_EMAIL &&
-          password === process.env.DASHBOARD_PASSWORD
-        ) {
-          return { id: "1", name: "NH Marketing", email };
+
+        // Primary user from DASHBOARD_EMAIL/DASHBOARD_PASSWORD, plus extra
+        // users from DASHBOARD_USERS ("email:password,email:password")
+        const users: { email: string; password: string }[] = [];
+        if (process.env.DASHBOARD_EMAIL && process.env.DASHBOARD_PASSWORD) {
+          users.push({
+            email: process.env.DASHBOARD_EMAIL,
+            password: process.env.DASHBOARD_PASSWORD,
+          });
+        }
+        for (const entry of (process.env.DASHBOARD_USERS || "").split(",")) {
+          const [userEmail, userPassword] = entry.split(":");
+          if (userEmail && userPassword) {
+            users.push({ email: userEmail.trim(), password: userPassword.trim() });
+          }
+        }
+
+        const match = users.find(
+          (u) => u.email.toLowerCase() === email && u.password === password
+        );
+        if (match) {
+          return { id: match.email, name: "NH Marketing", email: match.email };
         }
         return null;
       },
