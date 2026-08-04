@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { ChevronLeft, ChevronRight, Pencil, Check, Mail, MailOpen, MousePointerClick, Reply, AlertTriangle, UserMinus, ShieldAlert } from "lucide-react";
+import { Pencil, Check, Mail, MailOpen, MousePointerClick, Reply, AlertTriangle, UserMinus, ShieldAlert } from "lucide-react";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
+import { format, eachMonthOfInterval } from "date-fns";
 import { useAccount } from "@/context/account-context";
+import { useDateRange } from "@/context/date-range-context";
 import { formatNumber } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ */
@@ -23,31 +25,24 @@ interface EmailMonthLog {
 }
 
 const EMPTY_LOG: EmailMonthLog = {
-  delivered: 0,
-  opened: 0,
-  clicked: 0,
-  replied: 0,
-  bounced: 0,
-  unsubscribed: 0,
-  spamComplaints: 0,
+  delivered: 0, opened: 0, clicked: 0, replied: 0, bounced: 0, unsubscribed: 0, spamComplaints: 0,
 };
 
 type MetricKey = keyof EmailMonthLog;
 
-const METRIC_META: { key: MetricKey; label: string; color: string; icon: typeof Mail }[] = [
-  { key: "delivered",       label: "Emails Delivered",  color: "var(--primary)",        icon: Mail },
-  { key: "opened",          label: "Opened",            color: "var(--secondary)",      icon: MailOpen },
-  { key: "clicked",         label: "Clicked",           color: "var(--chart-accent-2)", icon: MousePointerClick },
-  { key: "replied",         label: "Replied",           color: "var(--chart-accent-3)", icon: Reply },
-  { key: "bounced",         label: "Bounced",           color: "var(--chart-accent-4)", icon: AlertTriangle },
-  { key: "unsubscribed",    label: "Unsubscribed",      color: "var(--chart-accent-5)", icon: UserMinus },
-  { key: "spamComplaints",  label: "Spam Complaints",   color: "var(--chart-accent-6)", icon: ShieldAlert },
+const METRIC_META: { key: MetricKey; label: string; short: string; color: string; icon: typeof Mail }[] = [
+  { key: "delivered",       label: "Emails Delivered",  short: "Delivered",    color: "var(--primary)",        icon: Mail },
+  { key: "opened",          label: "Opened",            short: "Opened",       color: "var(--secondary)",      icon: MailOpen },
+  { key: "clicked",         label: "Clicked",           short: "Clicked",      color: "var(--chart-accent-2)", icon: MousePointerClick },
+  { key: "replied",         label: "Replied",           short: "Replied",      color: "var(--chart-accent-3)", icon: Reply },
+  { key: "bounced",         label: "Bounced",           short: "Bounced",      color: "var(--chart-accent-4)", icon: AlertTriangle },
+  { key: "unsubscribed",    label: "Unsubscribed",      short: "Unsub",        color: "var(--chart-accent-5)", icon: UserMinus },
+  { key: "spamComplaints",  label: "Spam Complaints",   short: "Spam",         color: "var(--chart-accent-6)", icon: ShieldAlert },
 ];
 
 function storageKey(accountId: string) {
   return `nh-email-logs-${accountId}`;
 }
-
 function loadLogs(accountId: string): Record<string, EmailMonthLog> {
   try {
     const raw = localStorage.getItem(storageKey(accountId));
@@ -56,90 +51,49 @@ function loadLogs(accountId: string): Record<string, EmailMonthLog> {
     return {};
   }
 }
-
-function saveLogs(accountId: string, logs: Record<string, EmailMonthLog>) {
-  localStorage.setItem(storageKey(accountId), JSON.stringify(logs));
+function saveLogsLocal(accountId: string, logs: Record<string, EmailMonthLog>) {
+  try { localStorage.setItem(storageKey(accountId), JSON.stringify(logs)); } catch { /* ignore */ }
 }
-
-function monthKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
-
 function monthLabel(key: string) {
   const [y, m] = key.split("-");
-  const d = new Date(Number(y), Number(m) - 1);
-  return d.toLocaleString("default", { month: "short", year: "numeric" });
-}
-
-function monthLabelLong(date: Date) {
-  return date.toLocaleString("default", { month: "long", year: "numeric" });
+  return new Date(Number(y), Number(m) - 1).toLocaleString("default", { month: "short", year: "2-digit" });
 }
 
 /* ------------------------------------------------------------------ */
-/*  Editable stat card                                                */
+/*  Editable numeric cell                                             */
 /* ------------------------------------------------------------------ */
 
-function StatCard({
-  metricKey,
-  label,
-  value,
-  icon: Icon,
-  onChange,
-}: {
-  metricKey: MetricKey;
-  label: string;
-  value: number;
-  icon: typeof Mail;
-  onChange: (key: MetricKey, val: number) => void;
-}) {
+function EditableCell({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [editing, setEditing] = useState(false);
-  const [inputVal, setInputVal] = useState("");
-
-  const handleStart = () => {
-    setInputVal(String(value));
-    setEditing(true);
-  };
-
-  const handleSave = () => {
-    const num = Number(inputVal);
-    if (!isNaN(num) && num >= 0) onChange(metricKey, num);
-    setEditing(false);
-  };
-
-  return (
-    <div className="bg-card border border-border rounded-lg px-4 py-3 flex flex-col gap-1 group relative">
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" />
-        <span className="text-xs font-medium">{label}</span>
+  const [input, setInput] = useState("");
+  if (editing) {
+    return (
+      <div className="flex items-center justify-end gap-1">
+        <input
+          type="number"
+          min={0}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { const n = Number(input); if (!isNaN(n) && n >= 0) onChange(n); setEditing(false); }
+            if (e.key === "Escape") setEditing(false);
+          }}
+          onBlur={() => { const n = Number(input); if (!isNaN(n) && n >= 0) onChange(n); setEditing(false); }}
+          autoFocus
+          className="w-20 text-right text-sm bg-muted/50 border border-primary rounded px-1 py-0.5 outline-none"
+        />
       </div>
-      {editing ? (
-        <div className="flex items-center gap-2 mt-0.5">
-          <input
-            type="number"
-            min={0}
-            value={inputVal}
-            onChange={(e) => setInputVal(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") setEditing(false); }}
-            autoFocus
-            className="w-28 text-xl font-bold text-foreground bg-muted/50 border border-border rounded px-2 py-0.5 outline-none focus:border-primary"
-          />
-          <button onClick={handleSave} className="p-1.5 rounded-md bg-primary/10 hover:bg-primary/20 transition-colors">
-            <Check className="h-4 w-4 text-primary" />
-          </button>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2">
-          <p className="text-2xl font-bold text-foreground">{formatNumber(value)}</p>
-          <button
-            onClick={handleStart}
-            className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-muted transition-all"
-            title="Edit value"
-          >
-            <Pencil className="h-3 w-3 text-muted-foreground" />
-          </button>
-        </div>
-      )}
-    </div>
+    );
+  }
+  return (
+    <button
+      onClick={() => { setInput(String(value)); setEditing(true); }}
+      className="w-full text-right px-2 py-0.5 rounded hover:bg-muted transition-colors group inline-flex items-center justify-end gap-1"
+      title="Click to edit"
+    >
+      {formatNumber(value)}
+      <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
+    </button>
   );
 }
 
@@ -149,91 +103,159 @@ function StatCard({
 
 export function EmailStatsHeader() {
   const { apiAccountId } = useAccount();
-
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth());
-  });
-
+  const { dateRange } = useDateRange();
   const [logs, setLogs] = useState<Record<string, EmailMonthLog>>({});
+  const [loaded, setLoaded] = useState(false);
 
-  // Load logs when account changes
+  // Persist: mirror to localStorage (so Overview widgets that read
+  // nh-email-logs-* keep working) AND fire-and-forget to Supabase.
+  const persist = useCallback((next: Record<string, EmailMonthLog>, accountId: string) => {
+    saveLogsLocal(accountId, next);
+    fetch(`/api/email-logs?accountId=${encodeURIComponent(accountId)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ logs: next }),
+    }).catch(() => { /* localStorage mirror still holds the latest */ });
+  }, []);
+
+  // Load: prefer Supabase; fall back to localStorage; migrate local → Supabase
+  // when remote is empty. Always mirror the result to localStorage.
   useEffect(() => {
-    setLogs(loadLogs(apiAccountId));
-  }, [apiAccountId]);
+    const accountId = apiAccountId;
+    let cancelled = false;
+    setLoaded(false);
+    (async () => {
+      const local = loadLogs(accountId);
+      try {
+        const res = await fetch(`/api/email-logs?accountId=${encodeURIComponent(accountId)}`);
+        const json = await res.json();
+        if (cancelled) return;
+        if (json.status === "ok" && json.logs && typeof json.logs === "object") {
+          const remote = json.logs as Record<string, EmailMonthLog>;
+          if (Object.keys(remote).length > 0) {
+            setLogs(remote);
+            saveLogsLocal(accountId, remote);
+          } else if (Object.keys(local).length > 0) {
+            // Migrate existing local data up to Supabase.
+            setLogs(local);
+            persist(local, accountId);
+          } else {
+            setLogs({});
+          }
+        } else {
+          setLogs(local); // unconfigured/error → local fallback
+        }
+      } catch {
+        if (!cancelled) setLogs(local);
+      } finally {
+        if (!cancelled) setLoaded(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [apiAccountId, persist]);
 
-  const currentKey = monthKey(selectedMonth);
-  const currentLog = logs[currentKey] ?? { ...EMPTY_LOG };
-
-  const handleMetricChange = useCallback(
-    (key: MetricKey, val: number) => {
+  const handleChange = useCallback(
+    (mKey: string, metric: MetricKey, val: number) => {
       setLogs((prev) => {
-        const updated = {
-          ...prev,
-          [currentKey]: { ...(prev[currentKey] ?? { ...EMPTY_LOG }), [key]: val },
-        };
-        saveLogs(apiAccountId, updated);
-        return updated;
+        const next = { ...prev, [mKey]: { ...(prev[mKey] ?? { ...EMPTY_LOG }), [metric]: val } };
+        persist(next, apiAccountId);
+        return next;
       });
     },
-    [apiAccountId, currentKey],
+    [apiAccountId, persist],
   );
 
-  const prevMonth = () => setSelectedMonth((d) => new Date(d.getFullYear(), d.getMonth() - 1));
-  const nextMonth = () => setSelectedMonth((d) => new Date(d.getFullYear(), d.getMonth() + 1));
+  // Months inside the selected date range (these drive the table + chart).
+  const months = useMemo(() => {
+    try {
+      return eachMonthOfInterval({ start: dateRange.from, end: dateRange.to })
+        .map((d) => ({ key: format(d, "yyyy-MM"), label: monthLabel(format(d, "yyyy-MM")) }));
+    } catch {
+      return [];
+    }
+  }, [dateRange.from, dateRange.to]);
 
-  // Chart data: all months sorted chronologically
-  const chartData = useMemo(() => {
-    return Object.entries(logs)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, log]) => ({
-        month: monthLabel(key),
-        ...log,
-      }));
-  }, [logs]);
+  // Totals across the range for the summary cards.
+  const totals = useMemo(() => {
+    const t = { ...EMPTY_LOG };
+    for (const m of months) {
+      const log = logs[m.key];
+      if (!log) continue;
+      for (const meta of METRIC_META) t[meta.key] += log[meta.key] || 0;
+    }
+    return t;
+  }, [months, logs]);
+
+  const chartData = useMemo(
+    () => months.map((m) => ({ month: m.label, ...(logs[m.key] ?? EMPTY_LOG) })),
+    [months, logs],
+  );
+
+  if (!loaded) return <div className="h-32" />;
 
   return (
     <div className="space-y-6 mb-6">
-      {/* Month picker */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={prevMonth}
-            className="p-1.5 rounded-md hover:bg-muted transition-colors"
-          >
-            <ChevronLeft className="h-5 w-5 text-muted-foreground" />
-          </button>
-          <h3 className="text-lg font-semibold text-foreground min-w-[180px] text-center">
-            {monthLabelLong(selectedMonth)}
-          </h3>
-          <button
-            onClick={nextMonth}
-            className="p-1.5 rounded-md hover:bg-muted transition-colors"
-          >
-            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-          </button>
+      {/* Range totals */}
+      <div>
+        <p className="text-xs text-muted-foreground mb-2">
+          Totals for the selected date range ({months.length} {months.length === 1 ? "month" : "months"})
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+          {METRIC_META.map((m) => (
+            <div key={m.key} className="bg-card border border-border rounded-lg px-4 py-3 flex flex-col gap-1">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <m.icon className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium">{m.label}</span>
+              </div>
+              <p className="text-2xl font-bold text-foreground">{formatNumber(totals[m.key])}</p>
+            </div>
+          ))}
         </div>
-        <p className="text-xs text-muted-foreground">Click any number to edit</p>
       </div>
 
-      {/* Stat cards grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        {METRIC_META.map((m) => (
-          <StatCard
-            key={m.key}
-            metricKey={m.key}
-            label={m.label}
-            value={currentLog[m.key]}
-            icon={m.icon}
-            onChange={handleMetricChange}
-          />
-        ))}
+      {/* Editable monthly table */}
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="px-4 py-3 border-b border-border bg-muted/30 flex items-center justify-between">
+          <h4 className="text-sm font-semibold text-foreground">Monthly Entries</h4>
+          <p className="text-xs text-muted-foreground">Click any number to edit</p>
+        </div>
+        {months.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">Month</th>
+                  {METRIC_META.map((m) => (
+                    <th key={m.key} className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">{m.short}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {months.map((mo) => {
+                  const log = logs[mo.key] ?? EMPTY_LOG;
+                  return (
+                    <tr key={mo.key} className="border-b border-border last:border-0">
+                      <td className="px-4 py-2 font-medium text-card-foreground whitespace-nowrap">{mo.label}</td>
+                      {METRIC_META.map((m) => (
+                        <td key={m.key} className="px-3 py-1.5 text-right">
+                          <EditableCell value={log[m.key]} onChange={(v) => handleChange(mo.key, m.key, v)} />
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-6 text-center text-sm text-muted-foreground">Pick a date range to enter monthly stats.</div>
+        )}
       </div>
 
-      {/* Historical chart */}
+      {/* Trend chart */}
       {chartData.length > 0 && (
         <div className="bg-card border border-border rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-foreground mb-4">Monthly Email Performance</h4>
+          <h4 className="text-sm font-semibold text-foreground mb-4">Email Performance Over Time</h4>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
@@ -241,27 +263,12 @@ export function EmailStatsHeader() {
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
                 <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: "var(--card)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
+                  contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }}
                   formatter={(value: number) => formatNumber(value)}
                 />
-                <Legend
-                  wrapperStyle={{ fontSize: 11 }}
-                  iconType="circle"
-                  iconSize={8}
-                />
+                <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" iconSize={8} />
                 {METRIC_META.map((m) => (
-                  <Bar
-                    key={m.key}
-                    dataKey={m.key}
-                    name={m.label}
-                    fill={m.color}
-                    radius={[2, 2, 0, 0]}
-                  />
+                  <Bar key={m.key} dataKey={m.key} name={m.label} fill={m.color} radius={[2, 2, 0, 0]} />
                 ))}
               </BarChart>
             </ResponsiveContainer>
