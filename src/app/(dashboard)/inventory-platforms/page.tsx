@@ -5,7 +5,7 @@ import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
-import { Layers, TrendingUp, TrendingDown, Award, AlertTriangle, Calendar, DollarSign, Phone, RefreshCw, Pencil } from "lucide-react";
+import { Layers, TrendingUp, TrendingDown, Award, Calendar, DollarSign, Phone, RefreshCw, Pencil } from "lucide-react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { DataSourceBadge } from "@/components/layout/data-source-badge";
 import { externalLinks } from "@/lib/external-links";
@@ -13,7 +13,7 @@ import { useAccount } from "@/context/account-context";
 import { useBudget } from "@/context/budget-context";
 import { useDateRange } from "@/context/date-range-context";
 import { getPlatformsForAccount, type PlatformData } from "@/lib/inventory-platforms-data";
-import { format as fmtDate, differenceInDays, parseISO } from "date-fns";
+import { format as fmtDate, differenceInDays, parseISO, startOfYear } from "date-fns";
 
 /* ------------------------------------------------------------------ */
 /*  Hook: fetch live CRM info-submit data per platform per month      */
@@ -548,8 +548,12 @@ function FullPlatformView({ platforms, monthly }: { platforms: PlatformData[]; m
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const hasData = platforms.some((p) => p.monthlyData.length > 0);
   const roiRanking = hasData ? getROIScores(platforms) : [];
-  const bestPerformer = roiRanking[0];
-  const worstPerformer = roiRanking[roiRanking.length - 1];
+  // Top cards rank by total leads brought this period (most vs fewest), not ROI.
+  const byLeads = hasData
+    ? platforms.map((p) => ({ name: p.name, ...getCurrentStats(p) })).sort((a, b) => b.leads - a.leads)
+    : [];
+  const bestPerformer = byLeads[0];
+  const worstPerformer = byLeads[byLeads.length - 1];
 
   // Month-over-month trends from real CRM (info submits) + CallRail (calls) data.
   // Leads = calls + info submits per platform per month.
@@ -600,32 +604,36 @@ function FullPlatformView({ platforms, monthly }: { platforms: PlatformData[]; m
           <div className="rounded-lg border border-border bg-card p-4 flex items-center gap-3">
             <Award className="h-8 w-8 text-primary" />
             <div>
-              <p className="text-xs text-primary font-medium">Best ROI This Month</p>
+              <p className="text-xs text-primary font-medium">Best Performance This Month</p>
               <p className="text-lg font-bold text-foreground">{bestPerformer.name}</p>
-              <p className="text-xs text-muted-foreground">{formatCurrency(bestPerformer.cpl)} per lead -- {bestPerformer.leads} leads -- ROI Score: {bestPerformer.roiScore}/100</p>
+              <p className="text-xs text-muted-foreground">{bestPerformer.leads} leads -- {formatCurrency(bestPerformer.cpl)} per lead</p>
             </div>
           </div>
           <div className="rounded-lg border border-border bg-card p-4 flex items-center gap-3">
-            <AlertTriangle className="h-8 w-8 text-red-500" />
+            <TrendingDown className="h-8 w-8 text-muted-foreground" />
             <div>
-              <p className="text-xs text-red-500 font-medium">Highest Cost Per Lead</p>
+              <p className="text-xs text-muted-foreground font-medium">Fewest Leads This Month</p>
               <p className="text-lg font-bold text-foreground">{worstPerformer.name}</p>
-              <p className="text-xs text-muted-foreground">{formatCurrency(worstPerformer.cpl)} per lead -- {worstPerformer.leads} leads -- ROI Score: {worstPerformer.roiScore}/100</p>
+              <p className="text-xs text-muted-foreground">{worstPerformer.leads} leads -- {formatCurrency(worstPerformer.cpl)} per lead</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Platform Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 mb-4">
+      {/* Platform Cards — My Little Salesman + Commercial Truck Trader render
+          narrower since they're lower-priority platforms. */}
+      <div className="flex flex-wrap gap-3 mb-4">
         {platforms.map((p) => {
           const stats = getCurrentStats(p);
           const isSelected = selectedPlatform === p.name;
+          const isMinor = p.name === "My Little Salesman" || p.name === "Commercial Truck Trader";
           return (
             <button
               key={p.name}
               onClick={() => setSelectedPlatform(isSelected ? null : p.name)}
               className={`rounded-lg border p-4 text-left transition-all ${
+                isMinor ? "w-full sm:w-40 flex-none" : "flex-1 min-w-[190px]"
+              } ${
                 isSelected ? "border-primary ring-2 ring-primary/20 bg-primary/5" : "border-border bg-card hover:border-primary/30"
               }`}
             >
@@ -800,6 +808,14 @@ export default function InventoryPlatformsPage() {
   const endStr = fmtDate(dateRange.to, "yyyy-MM-dd");
   const { data: liveData, loading } = useLivePlatformData(currentAccount.id, startStr, endStr, staticPlatforms);
 
+  // The monthly trend charts always show the FULL current year (Jan 1 → today),
+  // month by month — they do NOT follow the global date selector. Fetched
+  // separately so the cards can still reflect the selected range.
+  const today = new Date();
+  const yearStartStr = fmtDate(startOfYear(today), "yyyy-MM-dd");
+  const yearEndStr = fmtDate(today, "yyyy-MM-dd");
+  const { data: yearData } = useLivePlatformData(currentAccount.id, yearStartStr, yearEndStr, staticPlatforms);
+
   // Merge live CRM + CallRail data into platform cards. Each platform's monthly
   // cost comes from the shared Budget tab (when a matching row exists), so the
   // cost-per-lead here reflects whatever budget the user maintains — edits on
@@ -837,9 +853,9 @@ export default function InventoryPlatformsPage() {
       </div>
 
       {isNHTTR ? (
-        <NHTTRPlatformView platforms={platforms} monthly={liveData?.monthly ?? []} />
+        <NHTTRPlatformView platforms={platforms} monthly={yearData?.monthly ?? []} />
       ) : (
-        <FullPlatformView platforms={platforms} monthly={liveData?.monthly ?? []} />
+        <FullPlatformView platforms={platforms} monthly={yearData?.monthly ?? []} />
       )}
     </div>
   );
