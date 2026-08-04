@@ -7,7 +7,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-server";
 //
 // Wire shape (client): { "YYYY-MM": { openRate, clickRate, replyRate, bounceRate } }.
 
-type EmailLog = { openRate: number; clickRate: number; replyRate: number; bounceRate: number };
+type EmailLog = { delivered: number; openRate: number; clickRate: number; replied: number; bounceRate: number };
 
 export async function GET(request: NextRequest) {
   const accountId = request.nextUrl.searchParams.get("accountId");
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("email_logs")
-    .select("month, open_rate, click_rate, reply_rate, bounce_rate")
+    .select("month, delivered, open_rate, click_rate, replied, bounce_rate")
     .eq("account_id", accountId);
 
   if (error) return NextResponse.json({ status: "error", error: error.message }, { status: 500 });
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   const logs: Record<string, EmailLog> = {};
   for (const r of data ?? []) {
     logs[r.month] = {
-      openRate: r.open_rate, clickRate: r.click_rate, replyRate: r.reply_rate, bounceRate: r.bounce_rate,
+      delivered: r.delivered, openRate: r.open_rate, clickRate: r.click_rate, replied: r.replied, bounceRate: r.bounce_rate,
     };
   }
   return NextResponse.json({ status: "ok", logs });
@@ -53,9 +53,10 @@ export async function PUT(request: NextRequest) {
   const rows = Object.entries(logs).map(([month, m]) => ({
     account_id: accountId,
     month,
+    delivered: m.delivered ?? 0,
     open_rate: m.openRate ?? 0,
     click_rate: m.clickRate ?? 0,
-    reply_rate: m.replyRate ?? 0,
+    replied: m.replied ?? 0,
     bounce_rate: m.bounceRate ?? 0,
   }));
   if (rows.length > 0) {

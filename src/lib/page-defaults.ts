@@ -323,7 +323,7 @@ export const nfiOverviewDefaults: PageDefault = {
     { id: "nfi-1", type: "stat", title: "Website Total Visitors", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true },
     { id: "nfi-2", type: "stat", title: "Email Open Rate", dataSource: "email-logs", metric: "openRate", format: "percent", comparisonEnabled: true },
     { id: "nfi-3", type: "stat", title: "Email Click Rate", dataSource: "email-logs", metric: "clickRate", format: "percent", comparisonEnabled: true },
-    { id: "nfi-3b", type: "stat", title: "Email Reply Rate", dataSource: "email-logs", metric: "replyRate", format: "percent", comparisonEnabled: true },
+    { id: "nfi-3b", type: "stat", title: "Email Replies", dataSource: "email-logs", metric: "replied", format: "number", comparisonEnabled: true },
     // Row 2: PPC stats
     { id: "nfi-4", type: "stat", title: "Paid Search Traffic (PPC)", dataSource: "google-analytics", metric: "sessions", format: "number", comparisonEnabled: true, dimension: "sessionDefaultChannelGroup", dimensionValue: "Paid Search" },
     { id: "nfi-5", type: "stat", title: "PPC Total Clicks", dataSource: "google-ads", metric: "clicks", format: "number", comparisonEnabled: true },

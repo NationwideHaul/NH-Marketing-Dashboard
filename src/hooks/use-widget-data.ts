@@ -9,10 +9,10 @@ import type { WidgetConfig } from "@/types/widget";
 import type { KPIMetric } from "@/types/kpi";
 
 // Reads the per-month email logs the user enters on the Email Marketing tab
-// (stored in localStorage as `nh-email-logs-<accountId>`). Values are RATES (%),
-// so this AVERAGES the chosen metric across the months in `from..to` that have
-// data. Returns 0 when the user hasn't filled in any logs yet.
-function avgEmailLogsMetric(
+// (stored in localStorage as `nh-email-logs-<accountId>`). Rate metrics (keys
+// ending in "Rate") are AVERAGED across the months in `from..to` that have data;
+// count metrics (delivered, replied) are SUMMED. Returns 0 when empty.
+function emailLogsMetric(
   accountId: string,
   metric: string,
   from: Date,
@@ -31,7 +31,9 @@ function avgEmailLogsMetric(
       if (entry && typeof entry[metric] === "number") vals.push(entry[metric]);
     }
     if (vals.length === 0) return 0;
-    return Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 10) / 10;
+    const total = vals.reduce((s, v) => s + v, 0);
+    if (metric.endsWith("Rate")) return Math.round((total / vals.length) * 10) / 10; // average rate
+    return total; // sum counts
   } catch {
     return 0;
   }
@@ -114,11 +116,11 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
 
   if (isEmailLogs) {
     void logsTick; // force recomputation when storage changes
-    const value = avgEmailLogsMetric(currentAccount.id, config.metric, dateRange.from, dateRange.to);
+    const value = emailLogsMetric(currentAccount.id, config.metric, dateRange.from, dateRange.to);
     let trend: "up" | "down" | "flat" = "flat";
     let changePercent = 0;
     if (config.comparisonEnabled) {
-      const prev = avgEmailLogsMetric(currentAccount.id, config.metric, prevStart, prevEnd);
+      const prev = emailLogsMetric(currentAccount.id, config.metric, prevStart, prevEnd);
       if (prev !== 0) {
         changePercent = ((value - prev) / prev) * 100;
         trend = changePercent > 0 ? "up" : changePercent < 0 ? "down" : "flat";

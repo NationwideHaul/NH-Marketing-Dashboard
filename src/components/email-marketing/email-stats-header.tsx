@@ -1,109 +1,89 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Pencil, MailOpen, MousePointerClick, Reply, AlertTriangle } from "lucide-react";
+import { Mail, MailOpen, MousePointerClick, Reply, AlertTriangle, PencilLine } from "lucide-react";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
 import { format, eachMonthOfInterval } from "date-fns";
 import { useAccount } from "@/context/account-context";
 import { useDateRange } from "@/context/date-range-context";
+import { formatNumber } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ */
-/*  Types & storage helpers                                           */
+/*  Types & metric definitions                                        */
 /* ------------------------------------------------------------------ */
 
-// All metrics are rates stored as a percentage number (e.g. 42.5 = 42.5%).
+// `delivered` and `replied` are counts (volume); the rest are rates stored as a
+// percentage number (e.g. 42.5 = 42.5%).
 interface EmailMonthLog {
+  delivered: number;
   openRate: number;
   clickRate: number;
-  replyRate: number;
+  replied: number;
   bounceRate: number;
 }
 
-const EMPTY_LOG: EmailMonthLog = { openRate: 0, clickRate: 0, replyRate: 0, bounceRate: 0 };
+const EMPTY_LOG: EmailMonthLog = { delivered: 0, openRate: 0, clickRate: 0, replied: 0, bounceRate: 0 };
 
 type MetricKey = keyof EmailMonthLog;
 
-const METRIC_META: { key: MetricKey; label: string; color: string; icon: typeof MailOpen }[] = [
-  { key: "openRate",   label: "Open Rate",   color: "var(--primary)",        icon: MailOpen },
-  { key: "clickRate",  label: "Click Rate",  color: "var(--chart-accent-2)", icon: MousePointerClick },
-  { key: "replyRate",  label: "Reply Rate",  color: "var(--chart-accent-3)", icon: Reply },
-  { key: "bounceRate", label: "Bounce Rate", color: "var(--chart-accent-4)", icon: AlertTriangle },
+// isRate: true → shown as % and AVERAGED over a range; false → a count, shown as
+// a plain number and SUMMED over a range.
+const METRIC_META: { key: MetricKey; label: string; isRate: boolean; color: string; icon: typeof Mail }[] = [
+  { key: "delivered",  label: "Emails Delivered", isRate: false, color: "var(--secondary)",      icon: Mail },
+  { key: "openRate",   label: "Open Rate",        isRate: true,  color: "var(--primary)",        icon: MailOpen },
+  { key: "clickRate",  label: "Click Rate",       isRate: true,  color: "var(--chart-accent-2)", icon: MousePointerClick },
+  { key: "replied",    label: "Replies",          isRate: false, color: "var(--chart-accent-3)", icon: Reply },
+  { key: "bounceRate", label: "Bounce Rate",      isRate: true,  color: "var(--chart-accent-4)", icon: AlertTriangle },
 ];
+const RATE_META = METRIC_META.filter((m) => m.isRate);
 
-const fmtPct = (v: number) => `${(v ?? 0).toFixed(1)}%`;
+const fmtVal = (v: number, isRate: boolean) => (isRate ? `${(v ?? 0).toFixed(1)}%` : formatNumber(v ?? 0));
 
-function storageKey(accountId: string) {
-  return `nh-email-logs-${accountId}`;
-}
+/* ------------------------------------------------------------------ */
+/*  Storage helpers                                                   */
+/* ------------------------------------------------------------------ */
+
+function storageKey(accountId: string) { return `nh-email-logs-${accountId}`; }
 function loadLogs(accountId: string): Record<string, EmailMonthLog> {
-  try {
-    const raw = localStorage.getItem(storageKey(accountId));
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
+  try { const raw = localStorage.getItem(storageKey(accountId)); return raw ? JSON.parse(raw) : {}; }
+  catch { return {}; }
 }
 function saveLogsLocal(accountId: string, logs: Record<string, EmailMonthLog>) {
   try { localStorage.setItem(storageKey(accountId), JSON.stringify(logs)); } catch { /* ignore */ }
 }
-function monthLabel(key: string) {
+function monthShort(key: string) {
   const [y, m] = key.split("-");
   return new Date(Number(y), Number(m) - 1).toLocaleString("default", { month: "short", year: "2-digit" });
 }
+function monthLong(key: string) {
+  const [y, m] = key.split("-");
+  return new Date(Number(y), Number(m) - 1).toLocaleString("default", { month: "long", year: "numeric" });
+}
 
 /* ------------------------------------------------------------------ */
-/*  Stat card (editable when a single month is selected)              */
+/*  Entry input (one field in the "enter data" row)                   */
 /* ------------------------------------------------------------------ */
 
-function StatCard({
-  label, value, icon: Icon, editable, onChange,
-}: {
-  label: string; value: number; icon: typeof MailOpen; editable: boolean; onChange: (v: number) => void;
+function EntryField({ label, defaultValue, isRate, onSave }: {
+  label: string; defaultValue: number; isRate: boolean; onSave: (v: number) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [input, setInput] = useState("");
   return (
-    <div className="bg-card border border-border rounded-lg px-4 py-3 flex flex-col gap-1 group relative">
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" />
-        <span className="text-xs font-medium">{label}</span>
-      </div>
-      {editable && editing ? (
-        <div className="flex items-center gap-1 mt-0.5">
-          <input
-            type="number"
-            min={0}
-            max={100}
-            step="0.1"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") { const n = Number(input); if (!isNaN(n) && n >= 0) onChange(n); setEditing(false); }
-              if (e.key === "Escape") setEditing(false);
-            }}
-            onBlur={() => { const n = Number(input); if (!isNaN(n) && n >= 0) onChange(n); setEditing(false); }}
-            autoFocus
-            className="w-20 text-xl font-bold text-foreground bg-muted/50 border border-primary rounded px-2 py-0.5 outline-none"
-          />
-          <span className="text-lg font-bold text-muted-foreground">%</span>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2">
-          <p className="text-2xl font-bold text-foreground">{fmtPct(value)}</p>
-          {editable && (
-            <button
-              onClick={() => { setInput(String(value)); setEditing(true); }}
-              className="p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-muted transition-all"
-              title="Edit value"
-            >
-              <Pencil className="h-3 w-3 text-muted-foreground" />
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+    <label className="flex flex-col gap-1">
+      <span className="text-xs font-medium text-muted-foreground">{label}{isRate ? " (%)" : ""}</span>
+      <input
+        type="number"
+        min={0}
+        max={isRate ? 100 : undefined}
+        step={isRate ? "0.1" : "1"}
+        defaultValue={defaultValue || ""}
+        placeholder="0"
+        onBlur={(e) => { const n = Number(e.target.value); if (!isNaN(n) && n >= 0) onSave(n); }}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        className="w-full text-sm font-semibold text-foreground bg-background border border-border rounded-md px-2 py-1.5 outline-none focus:border-primary"
+      />
+    </label>
   );
 }
 
@@ -138,18 +118,10 @@ export function EmailStatsHeader() {
         if (cancelled) return;
         if (json.status === "ok" && json.logs && typeof json.logs === "object") {
           const remote = json.logs as Record<string, EmailMonthLog>;
-          if (Object.keys(remote).length > 0) {
-            setLogs(remote);
-            saveLogsLocal(accountId, remote);
-          } else if (Object.keys(local).length > 0) {
-            setLogs(local);
-            persist(local, accountId);
-          } else {
-            setLogs({});
-          }
-        } else {
-          setLogs(local);
-        }
+          if (Object.keys(remote).length > 0) { setLogs(remote); saveLogsLocal(accountId, remote); }
+          else if (Object.keys(local).length > 0) { setLogs(local); persist(local, accountId); }
+          else setLogs({});
+        } else setLogs(local);
       } catch {
         if (!cancelled) setLogs(local);
       } finally {
@@ -159,75 +131,101 @@ export function EmailStatsHeader() {
     return () => { cancelled = true; };
   }, [apiAccountId, persist]);
 
-  const handleChange = useCallback(
-    (mKey: string, metric: MetricKey, val: number) => {
-      setLogs((prev) => {
-        const next = { ...prev, [mKey]: { ...(prev[mKey] ?? { ...EMPTY_LOG }), [metric]: val } };
-        persist(next, apiAccountId);
-        return next;
-      });
-    },
-    [apiAccountId, persist],
-  );
+  const handleChange = useCallback((mKey: string, metric: MetricKey, val: number) => {
+    setLogs((prev) => {
+      const next = { ...prev, [mKey]: { ...(prev[mKey] ?? { ...EMPTY_LOG }), [metric]: val } };
+      persist(next, apiAccountId);
+      return next;
+    });
+  }, [apiAccountId, persist]);
 
-  // Months inside the selected date range.
+  // Months in the selected date range (drive the summary cards + chart).
   const months = useMemo(() => {
     try {
-      return eachMonthOfInterval({ start: dateRange.from, end: dateRange.to })
-        .map((d) => ({ key: format(d, "yyyy-MM"), label: monthLabel(format(d, "yyyy-MM")) }));
-    } catch {
-      return [];
-    }
+      return eachMonthOfInterval({ start: dateRange.from, end: dateRange.to }).map((d) => format(d, "yyyy-MM"));
+    } catch { return []; }
   }, [dateRange.from, dateRange.to]);
 
-  const singleMonth = months.length === 1;
-
-  // Rates can't be summed — a single month shows that month's rates; a multi-month
-  // range shows the AVERAGE across the months that have data.
+  // Summary: counts are summed, rates are averaged over months with data.
   const stats = useMemo(() => {
-    if (singleMonth) return logs[months[0].key] ?? EMPTY_LOG;
     const out = { ...EMPTY_LOG };
     for (const meta of METRIC_META) {
-      const vals = months.map((m) => logs[m.key]).filter(Boolean).map((l) => l![meta.key]);
-      out[meta.key] = vals.length ? Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 10) / 10 : 0;
+      const vals = months.map((k) => logs[k]).filter(Boolean).map((l) => l![meta.key]);
+      if (meta.isRate) out[meta.key] = vals.length ? Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 10) / 10 : 0;
+      else out[meta.key] = vals.reduce((s, v) => s + v, 0);
     }
     return out;
-  }, [singleMonth, months, logs]);
+  }, [months, logs]);
 
   const chartData = useMemo(
-    () => months.map((m) => ({ month: m.label, ...(logs[m.key] ?? EMPTY_LOG) })),
+    () => months.map((k) => ({ month: monthShort(k), ...(logs[k] ?? EMPTY_LOG) })),
     [months, logs],
   );
+
+  // Month picker for the entry panel — last 18 months.
+  const monthOptions = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 18 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      return { key: format(d, "yyyy-MM"), label: monthLong(format(d, "yyyy-MM")) };
+    });
+  }, []);
+  const [editMonth, setEditMonth] = useState(() => format(new Date(), "yyyy-MM"));
+  const editLog = logs[editMonth] ?? EMPTY_LOG;
 
   if (!loaded) return <div className="h-32" />;
 
   return (
     <div className="space-y-6 mb-6">
-      {/* Rate cards — show the selected range; editable when it's a single month */}
+      {/* Summary cards for the selected range (read-only) */}
       <div>
         <p className="text-xs text-muted-foreground mb-2">
-          {singleMonth
-            ? `Rates for ${months[0].label} — click a number to edit`
-            : `Average rates for the selected range (${months.length} months) — pick a single month to edit`}
+          {months.length === 1 ? `Stats for ${monthShort(months[0])}` : `Selected range · ${months.length} months (counts summed, rates averaged)`}
         </p>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           {METRIC_META.map((m) => (
-            <StatCard
-              key={m.key}
+            <div key={m.key} className="bg-card border border-border rounded-lg px-4 py-3 flex flex-col gap-1">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <m.icon className="h-3.5 w-3.5" />
+                <span className="text-xs font-medium">{m.label}</span>
+              </div>
+              <p className="text-2xl font-bold text-foreground">{fmtVal(stats[m.key], m.isRate)}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Entry panel — pick a month and type the numbers */}
+      <div className="bg-card border border-border rounded-lg p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <PencilLine className="h-4 w-4 text-primary" />
+          <h4 className="text-sm font-semibold text-foreground">Enter data</h4>
+          <select
+            value={editMonth}
+            onChange={(e) => setEditMonth(e.target.value)}
+            className="ml-1 text-sm border border-border rounded-md bg-background px-2 py-1 outline-none focus:border-primary"
+          >
+            {monthOptions.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+          </select>
+          <span className="text-xs text-muted-foreground">— type each value, it saves automatically</span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {METRIC_META.map((m) => (
+            <EntryField
+              key={`${editMonth}-${m.key}`}
               label={m.label}
-              value={stats[m.key]}
-              icon={m.icon}
-              editable={singleMonth}
-              onChange={(v) => handleChange(months[0].key, m.key, v)}
+              defaultValue={editLog[m.key]}
+              isRate={m.isRate}
+              onSave={(v) => handleChange(editMonth, m.key, v)}
             />
           ))}
         </div>
       </div>
 
-      {/* Trend chart */}
+      {/* Rate trends */}
       {chartData.length > 1 && (
         <div className="bg-card border border-border rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-foreground mb-4">Email Rates Over Time</h4>
+          <h4 className="text-sm font-semibold text-foreground mb-4">Rate Trends Over Time</h4>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
@@ -239,7 +237,7 @@ export function EmailStatsHeader() {
                   formatter={(value: number) => `${Number(value).toFixed(1)}%`}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" iconSize={8} />
-                {METRIC_META.map((m) => (
+                {RATE_META.map((m) => (
                   <Line key={m.key} type="monotone" dataKey={m.key} name={m.label} stroke={m.color} strokeWidth={2} dot={{ r: 3 }} />
                 ))}
               </LineChart>
