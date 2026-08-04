@@ -7,7 +7,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-server";
 //
 // Wire shape (client): { "YYYY-MM": { openRate, clickRate, replyRate, bounceRate } }.
 
-type EmailLog = { delivered: number; openRate: number; clickRate: number; replied: number; bounceRate: number };
+type EmailLog = { delivered: number; openRate: number; clickRate: number; replied: number; bounced: number };
 
 export async function GET(request: NextRequest) {
   const accountId = request.nextUrl.searchParams.get("accountId");
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("email_logs")
-    .select("month, delivered, open_rate, click_rate, replied, bounce_rate")
+    .select("month, delivered, open_rate, click_rate, replied, bounced")
     .eq("account_id", accountId);
 
   if (error) return NextResponse.json({ status: "error", error: error.message }, { status: 500 });
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   const logs: Record<string, EmailLog> = {};
   for (const r of data ?? []) {
     logs[r.month] = {
-      delivered: r.delivered, openRate: r.open_rate, clickRate: r.click_rate, replied: r.replied, bounceRate: r.bounce_rate,
+      delivered: r.delivered, openRate: r.open_rate, clickRate: r.click_rate, replied: r.replied, bounced: r.bounced,
     };
   }
   return NextResponse.json({ status: "ok", logs });
@@ -57,7 +57,7 @@ export async function PUT(request: NextRequest) {
     open_rate: m.openRate ?? 0,
     click_rate: m.clickRate ?? 0,
     replied: m.replied ?? 0,
-    bounce_rate: m.bounceRate ?? 0,
+    bounced: m.bounced ?? 0,
   }));
   if (rows.length > 0) {
     const ins = await supabase.from("email_logs").insert(rows);

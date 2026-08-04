@@ -21,10 +21,10 @@ interface EmailMonthLog {
   openRate: number;
   clickRate: number;
   replied: number;
-  bounceRate: number;
+  bounced: number;
 }
 
-const EMPTY_LOG: EmailMonthLog = { delivered: 0, openRate: 0, clickRate: 0, replied: 0, bounceRate: 0 };
+const EMPTY_LOG: EmailMonthLog = { delivered: 0, openRate: 0, clickRate: 0, replied: 0, bounced: 0 };
 
 type MetricKey = keyof EmailMonthLog;
 
@@ -35,7 +35,7 @@ const METRIC_META: { key: MetricKey; label: string; isRate: boolean; color: stri
   { key: "openRate",   label: "Open Rate",        isRate: true,  color: "var(--primary)",        icon: MailOpen },
   { key: "clickRate",  label: "Click Rate",       isRate: true,  color: "var(--chart-accent-2)", icon: MousePointerClick },
   { key: "replied",    label: "Replies",          isRate: false, color: "var(--chart-accent-3)", icon: Reply },
-  { key: "bounceRate", label: "Bounce Rate",      isRate: true,  color: "var(--chart-accent-4)", icon: AlertTriangle },
+  { key: "bounced",    label: "Bounced",          isRate: false, color: "var(--chart-accent-4)", icon: AlertTriangle },
 ];
 const RATE_META = METRIC_META.filter((m) => m.isRate);
 
