@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Mail, MailOpen, MousePointerClick, Reply, AlertTriangle, PencilLine } from "lucide-react";
+import { Mail, MailOpen, MousePointerClick, Reply, AlertTriangle, Pencil } from "lucide-react";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
@@ -57,33 +57,42 @@ function monthShort(key: string) {
   const [y, m] = key.split("-");
   return new Date(Number(y), Number(m) - 1).toLocaleString("default", { month: "short", year: "2-digit" });
 }
-function monthLong(key: string) {
-  const [y, m] = key.split("-");
-  return new Date(Number(y), Number(m) - 1).toLocaleString("default", { month: "long", year: "numeric" });
-}
 
 /* ------------------------------------------------------------------ */
 /*  Entry input (one field in the "enter data" row)                   */
 /* ------------------------------------------------------------------ */
 
-function EntryField({ label, defaultValue, isRate, onSave }: {
-  label: string; defaultValue: number; isRate: boolean; onSave: (v: number) => void;
-}) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-medium text-muted-foreground">{label}{isRate ? " (%)" : ""}</span>
+function EditableCell({ value, isRate, onSave }: { value: number; isRate: boolean; onSave: (v: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [input, setInput] = useState("");
+  if (editing) {
+    return (
       <input
         type="number"
         min={0}
         max={isRate ? 100 : undefined}
         step={isRate ? "0.1" : "1"}
-        defaultValue={defaultValue || ""}
-        placeholder="0"
-        onBlur={(e) => { const n = Number(e.target.value); if (!isNaN(n) && n >= 0) onSave(n); }}
-        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-        className="w-full text-sm font-semibold text-foreground bg-background border border-border rounded-md px-2 py-1.5 outline-none focus:border-primary"
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { const n = Number(input); if (!isNaN(n) && n >= 0) onSave(n); setEditing(false); }
+          if (e.key === "Escape") setEditing(false);
+        }}
+        onBlur={() => { const n = Number(input); if (!isNaN(n) && n >= 0) onSave(n); setEditing(false); }}
+        autoFocus
+        className="w-20 text-right text-sm bg-muted/50 border border-primary rounded px-1 py-0.5 outline-none"
       />
-    </label>
+    );
+  }
+  return (
+    <button
+      onClick={() => { setInput(String(value)); setEditing(true); }}
+      className="w-full text-right px-2 py-0.5 rounded hover:bg-muted transition-colors group inline-flex items-center justify-end gap-1"
+      title="Click to edit"
+    >
+      {isRate ? `${(value ?? 0).toFixed(1)}%` : formatNumber(value ?? 0)}
+      <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100" />
+    </button>
   );
 }
 
@@ -162,17 +171,6 @@ export function EmailStatsHeader() {
     [months, logs],
   );
 
-  // Month picker for the entry panel — last 18 months.
-  const monthOptions = useMemo(() => {
-    const now = new Date();
-    return Array.from({ length: 18 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      return { key: format(d, "yyyy-MM"), label: monthLong(format(d, "yyyy-MM")) };
-    });
-  }, []);
-  const [editMonth, setEditMonth] = useState(() => format(new Date(), "yyyy-MM"));
-  const editLog = logs[editMonth] ?? EMPTY_LOG;
-
   if (!loaded) return <div className="h-32" />;
 
   return (
@@ -195,31 +193,45 @@ export function EmailStatsHeader() {
         </div>
       </div>
 
-      {/* Entry panel — pick a month and type the numbers */}
-      <div className="bg-card border border-border rounded-lg p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <PencilLine className="h-4 w-4 text-primary" />
-          <h4 className="text-sm font-semibold text-foreground">Enter data</h4>
-          <select
-            value={editMonth}
-            onChange={(e) => setEditMonth(e.target.value)}
-            className="ml-1 text-sm border border-border rounded-md bg-background px-2 py-1 outline-none focus:border-primary"
-          >
-            {monthOptions.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-          </select>
-          <span className="text-xs text-muted-foreground">— type each value, it saves automatically</span>
+      {/* One editable row per month in the selected range — this is where you type */}
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="px-4 py-3 border-b border-border bg-muted/30 flex items-center justify-between">
+          <h4 className="text-sm font-semibold text-foreground">Enter / edit by month</h4>
+          <p className="text-xs text-muted-foreground">Click any number to edit — saves automatically</p>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {METRIC_META.map((m) => (
-            <EntryField
-              key={`${editMonth}-${m.key}`}
-              label={m.label}
-              defaultValue={editLog[m.key]}
-              isRate={m.isRate}
-              onSave={(v) => handleChange(editMonth, m.key, v)}
-            />
-          ))}
-        </div>
+        {months.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">Month</th>
+                  {METRIC_META.map((m) => (
+                    <th key={m.key} className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">
+                      {m.label}{m.isRate ? " (%)" : ""}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {months.map((k) => {
+                  const log = logs[k] ?? EMPTY_LOG;
+                  return (
+                    <tr key={k} className="border-b border-border last:border-0">
+                      <td className="px-4 py-2 font-medium text-card-foreground whitespace-nowrap">{monthShort(k)}</td>
+                      {METRIC_META.map((m) => (
+                        <td key={m.key} className="px-3 py-1.5 text-right">
+                          <EditableCell value={log[m.key]} isRate={m.isRate} onSave={(v) => handleChange(k, m.key, v)} />
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-6 text-center text-sm text-muted-foreground">Pick a date range above to see and enter months.</div>
+        )}
       </div>
 
       {/* Rate trends */}
