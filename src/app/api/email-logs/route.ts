@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 
-// Manual email-marketing stats persistence, backed by the dashboard's Supabase.
-// Server-side only; gated by the auth middleware. Returns status "unconfigured"
-// so the client falls back to localStorage when Supabase isn't set up.
+// Manual email-marketing RATES persistence (open/click/reply/bounce rate as %),
+// backed by the dashboard's Supabase. Server-side only; gated by auth middleware.
+// Returns status "unconfigured" so the client falls back to localStorage.
 //
-// Wire shape (client): { "YYYY-MM": { delivered, opened, clicked, replied,
-// bounced, unsubscribed, spamComplaints } }. DB uses spam_complaints.
+// Wire shape (client): { "YYYY-MM": { openRate, clickRate, replyRate, bounceRate } }.
 
-type EmailLog = {
-  delivered: number; opened: number; clicked: number; replied: number;
-  bounced: number; unsubscribed: number; spamComplaints: number;
-};
+type EmailLog = { openRate: number; clickRate: number; replyRate: number; bounceRate: number };
 
 export async function GET(request: NextRequest) {
   const accountId = request.nextUrl.searchParams.get("accountId");
@@ -22,7 +18,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabase
     .from("email_logs")
-    .select("month, delivered, opened, clicked, replied, bounced, unsubscribed, spam_complaints")
+    .select("month, open_rate, click_rate, reply_rate, bounce_rate")
     .eq("account_id", accountId);
 
   if (error) return NextResponse.json({ status: "error", error: error.message }, { status: 500 });
@@ -30,8 +26,7 @@ export async function GET(request: NextRequest) {
   const logs: Record<string, EmailLog> = {};
   for (const r of data ?? []) {
     logs[r.month] = {
-      delivered: r.delivered, opened: r.opened, clicked: r.clicked, replied: r.replied,
-      bounced: r.bounced, unsubscribed: r.unsubscribed, spamComplaints: r.spam_complaints,
+      openRate: r.open_rate, clickRate: r.click_rate, replyRate: r.reply_rate, bounceRate: r.bounce_rate,
     };
   }
   return NextResponse.json({ status: "ok", logs });
@@ -52,20 +47,16 @@ export async function PUT(request: NextRequest) {
   }
   const logs = body?.logs ?? {};
 
-  // Replace the account's rows wholesale.
   const del = await supabase.from("email_logs").delete().eq("account_id", accountId);
   if (del.error) return NextResponse.json({ status: "error", error: del.error.message }, { status: 500 });
 
   const rows = Object.entries(logs).map(([month, m]) => ({
     account_id: accountId,
     month,
-    delivered: m.delivered ?? 0,
-    opened: m.opened ?? 0,
-    clicked: m.clicked ?? 0,
-    replied: m.replied ?? 0,
-    bounced: m.bounced ?? 0,
-    unsubscribed: m.unsubscribed ?? 0,
-    spam_complaints: m.spamComplaints ?? 0,
+    open_rate: m.openRate ?? 0,
+    click_rate: m.clickRate ?? 0,
+    reply_rate: m.replyRate ?? 0,
+    bounce_rate: m.bounceRate ?? 0,
   }));
   if (rows.length > 0) {
     const ins = await supabase.from("email_logs").insert(rows);

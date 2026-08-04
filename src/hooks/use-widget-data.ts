@@ -9,10 +9,10 @@ import type { WidgetConfig } from "@/types/widget";
 import type { KPIMetric } from "@/types/kpi";
 
 // Reads the per-month email logs the user enters on the Email Marketing tab
-// (stored in localStorage as `nh-email-logs-<accountId>`) and sums the chosen
-// metric across every month that falls inside `from..to`. Returns 0 when the
-// user hasn't filled in any logs yet.
-function sumEmailLogsMetric(
+// (stored in localStorage as `nh-email-logs-<accountId>`). Values are RATES (%),
+// so this AVERAGES the chosen metric across the months in `from..to` that have
+// data. Returns 0 when the user hasn't filled in any logs yet.
+function avgEmailLogsMetric(
   accountId: string,
   metric: string,
   from: Date,
@@ -24,13 +24,14 @@ function sumEmailLogsMetric(
     if (!raw) return 0;
     const logs = JSON.parse(raw) as Record<string, Record<string, number>>;
     const months = eachMonthOfInterval({ start: from, end: to });
-    let total = 0;
+    const vals: number[] = [];
     for (const m of months) {
       const key = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`;
       const entry = logs[key];
-      if (entry && typeof entry[metric] === "number") total += entry[metric];
+      if (entry && typeof entry[metric] === "number") vals.push(entry[metric]);
     }
-    return total;
+    if (vals.length === 0) return 0;
+    return Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 10) / 10;
   } catch {
     return 0;
   }
@@ -113,11 +114,11 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
 
   if (isEmailLogs) {
     void logsTick; // force recomputation when storage changes
-    const value = sumEmailLogsMetric(currentAccount.id, config.metric, dateRange.from, dateRange.to);
+    const value = avgEmailLogsMetric(currentAccount.id, config.metric, dateRange.from, dateRange.to);
     let trend: "up" | "down" | "flat" = "flat";
     let changePercent = 0;
     if (config.comparisonEnabled) {
-      const prev = sumEmailLogsMetric(currentAccount.id, config.metric, prevStart, prevEnd);
+      const prev = avgEmailLogsMetric(currentAccount.id, config.metric, prevStart, prevEnd);
       if (prev !== 0) {
         changePercent = ((value - prev) / prev) * 100;
         trend = changePercent > 0 ? "up" : changePercent < 0 ? "down" : "flat";
