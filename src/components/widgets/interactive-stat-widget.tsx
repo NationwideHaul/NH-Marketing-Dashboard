@@ -81,7 +81,7 @@ export function InteractiveStatWidget({ config }: { config: WidgetConfig }) {
               trend === "down" && "text-muted-foreground",
               trend === "flat" && "text-muted-foreground"
             )}>
-              {change > 0 ? "+" : ""}{change.toFixed(1)}% vs prev
+              {change > 0 ? "+" : ""}{change.toFixed(1)}{metric.changeUnit === "pts" ? " pts" : "%"} vs prev month
             </span>
           </div>
         )}
@@ -118,7 +118,7 @@ export function InteractiveStatWidget({ config }: { config: WidgetConfig }) {
                         trend === "up" && "text-primary",
                         trend === "down" && "text-muted-foreground"
                       )}>
-                        {change > 0 ? "+" : ""}{change.toFixed(1)}%
+                        {change > 0 ? "+" : ""}{change.toFixed(1)}{metric.changeUnit === "pts" ? " pts" : "%"}
                       </span>
                     </div>
                   )}

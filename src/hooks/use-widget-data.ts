@@ -4,9 +4,22 @@ import useSWR from "swr";
 import { useState, useEffect } from "react";
 import { useDateRange } from "@/context/date-range-context";
 import { useAccount } from "@/context/account-context";
-import { format, differenceInDays, subDays, eachMonthOfInterval, startOfYear } from "date-fns";
+import { format, subDays, eachMonthOfInterval, startOfYear, subMonths } from "date-fns";
 import type { WidgetConfig } from "@/types/widget";
 import type { KPIMetric } from "@/types/kpi";
+
+// Computes the "vs prev" change. For percent-format metrics the change is
+// expressed in percentage POINTS (current − previous) — e.g. 1.9% → 7.1% shows
+// "+5.2 pts", not a misleading "+274%". Other metrics use a normal % change.
+function computeChange(value: number, prev: number, format: string): Pick<KPIMetric, "changePercent" | "changeUnit" | "trend"> {
+  if (prev === 0) return { changePercent: 0, changeUnit: "%", trend: "flat" };
+  if (format === "percent") {
+    const pts = Math.round((value - prev) * 10) / 10;
+    return { changePercent: pts, changeUnit: "pts", trend: pts > 0 ? "up" : pts < 0 ? "down" : "flat" };
+  }
+  const pct = ((value - prev) / prev) * 100;
+  return { changePercent: pct, changeUnit: "%", trend: pct > 0 ? "up" : pct < 0 ? "down" : "flat" };
+}
 
 // Reads the per-month email logs the user enters on the Email Marketing tab
 // (stored in localStorage as `nh-email-logs-<accountId>`). Rate metrics (keys
@@ -86,10 +99,9 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
   const dimensionParam = config.dimension ? `&dimension=${encodeURIComponent(config.dimension)}` : "";
   const url = `${route}${sep}startDate=${startDate}&endDate=${endDate}&accountId=${apiAccountId}${dimensionParam}`;
 
-  // Calculate previous period (same duration, immediately before)
-  const days = differenceInDays(dateRange.to, dateRange.from) + 1;
-  const prevEnd = subDays(dateRange.from, 1);
-  const prevStart = subDays(prevEnd, days - 1);
+  // Comparison baseline = the SAME range one month earlier ("vs previous month").
+  const prevStart = subMonths(dateRange.from, 1);
+  const prevEnd = subMonths(dateRange.to, 1);
   const prevUrl = `${route}${sep}startDate=${format(prevStart, "yyyy-MM-dd")}&endDate=${format(prevEnd, "yyyy-MM-dd")}&accountId=${apiAccountId}${dimensionParam}`;
 
   // SWR keys are null for email-logs so no network request fires. Hooks still
@@ -117,16 +129,12 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
   if (isEmailLogs) {
     void logsTick; // force recomputation when storage changes
     const value = emailLogsMetric(currentAccount.id, config.metric, dateRange.from, dateRange.to);
-    let trend: "up" | "down" | "flat" = "flat";
-    let changePercent = 0;
+    let change: Pick<KPIMetric, "changePercent" | "changeUnit" | "trend"> = { changePercent: 0, changeUnit: "%", trend: "flat" };
     if (config.comparisonEnabled) {
       const prev = emailLogsMetric(currentAccount.id, config.metric, prevStart, prevEnd);
-      if (prev !== 0) {
-        changePercent = ((value - prev) / prev) * 100;
-        trend = changePercent > 0 ? "up" : changePercent < 0 ? "down" : "flat";
-      }
+      change = computeChange(value, prev, config.format);
     }
-    return { id: config.metric, label: config.title, value, format: config.format, trend, changePercent };
+    return { id: config.metric, label: config.title, value, format: config.format, ...change };
   }
 
   if (!data || data.status === "error") return null;
@@ -135,15 +143,12 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
   const metricValue = extractMetric(data, config.metric, config.dataSource, config.tracker, config.dimensionValue);
   if (metricValue === null) return null;
 
-  // Compute trend vs previous period
-  let trend: "up" | "down" | "flat" = "flat";
-  let changePercent = 0;
-
+  // Compute change vs the previous month
+  let change: Pick<KPIMetric, "changePercent" | "changeUnit" | "trend"> = { changePercent: 0, changeUnit: "%", trend: "flat" };
   if (config.comparisonEnabled && prevData && prevData.status !== "error") {
     const prevValue = extractMetric(prevData, config.metric, config.dataSource, config.tracker, config.dimensionValue);
     if (prevValue !== null && prevValue !== 0) {
-      changePercent = ((metricValue - prevValue) / prevValue) * 100;
-      trend = changePercent > 0 ? "up" : changePercent < 0 ? "down" : "flat";
+      change = computeChange(metricValue, prevValue, config.format);
     }
   }
 
@@ -152,8 +157,7 @@ export function useWidgetMetric(config: WidgetConfig): KPIMetric | null {
     label: config.title,
     value: metricValue,
     format: config.format,
-    trend,
-    changePercent,
+    ...change,
   };
 }
 

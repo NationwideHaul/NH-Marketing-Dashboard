@@ -6,6 +6,10 @@ export interface KPIMetric {
   format: "number" | "currency" | "percent";
   trend?: "up" | "down" | "flat";
   changePercent?: number;
+  // For percent-format metrics the change is expressed in percentage POINTS
+  // (current − previous), not a percent-of-a-percent; "pts" tells the UI to
+  // label it accordingly. Defaults to "%".
+  changeUnit?: "%" | "pts";
 }
 
 export interface PlatformData {
