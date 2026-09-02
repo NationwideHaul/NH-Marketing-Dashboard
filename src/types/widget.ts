@@ -45,6 +45,7 @@ export interface WidgetConfig {
   sectionTitle?: string; // For section-header widgets: display title
   trendMonths?: number; // For chart widgets: override date range to show N months of data
   yearToDate?: boolean; // For chart widgets: ignore the global date selector and always show Jan 1 of the current year → today (month-by-month YTD comparison)
+  excludeCurrentMonth?: boolean; // For chart widgets: drop the in-progress current month so a partial month doesn't read as a decline
   tracker?: string; // For callrail widgets: filter to a specific tracker name (e.g. "Truck Paper") from the company's trackerBreakdown
 }
 

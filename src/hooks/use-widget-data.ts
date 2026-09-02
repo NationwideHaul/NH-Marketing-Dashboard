@@ -4,7 +4,7 @@ import useSWR from "swr";
 import { useState, useEffect } from "react";
 import { useDateRange } from "@/context/date-range-context";
 import { useAccount } from "@/context/account-context";
-import { format, subDays, eachMonthOfInterval, startOfYear, subMonths } from "date-fns";
+import { format, subDays, eachMonthOfInterval, startOfYear, subMonths, endOfMonth } from "date-fns";
 import type { WidgetConfig } from "@/types/widget";
 import type { KPIMetric } from "@/types/kpi";
 
@@ -178,7 +178,13 @@ export function useWidgetTimeSeries(config: WidgetConfig): { date: string; value
     : config.trendMonths
     ? subDays(dateRange.to, config.trendMonths * 30)
     : dateRange.from;
-  const effectiveEnd = config.yearToDate ? today : dateRange.to;
+  let effectiveEnd = config.yearToDate ? today : dateRange.to;
+  // config.excludeCurrentMonth: the in-progress month would chart as a partial
+  // (misleadingly low) point, so cap the range at the end of last month.
+  if (config.excludeCurrentMonth) {
+    const prevMonthEnd = endOfMonth(subMonths(today, 1));
+    if (effectiveEnd > prevMonthEnd) effectiveEnd = prevMonthEnd;
+  }
   const startDate = format(effectiveStart, "yyyy-MM-dd");
   const endDate = format(effectiveEnd, "yyyy-MM-dd");
   const route = getApiRoute(config.dataSource);

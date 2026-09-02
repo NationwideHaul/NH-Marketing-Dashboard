@@ -342,12 +342,12 @@ export const nfiOverviewDefaults: PageDefault = {
     // Section: Trends Over Time
     { id: "nfi-sec", type: "section-header", title: "Trends Over Time", dataSource: "overview", metric: "none", format: "number", sectionTitle: "Trends Over Time" },
     // Charts — fixed year-to-date (Jan 1 → today) for month-by-month comparison
-    { id: "nfi-13", type: "line-chart", title: "Website Traffic", dataSource: "google-analytics", metric: "sessions", format: "number", yearToDate: true },
-    { id: "nfi-14", type: "bar-chart", title: "PPC Clicks", dataSource: "google-ads", metric: "clicks", format: "number", yearToDate: true },
-    { id: "nfi-15", type: "line-chart", title: "PPC Conversions", dataSource: "google-ads", metric: "conversions", format: "number", yearToDate: true },
-    { id: "nfi-16", type: "line-chart", title: "PPC Cost Per Click", dataSource: "google-ads", metric: "cpc", format: "currency", yearToDate: true },
-    { id: "nfi-17", type: "area-chart", title: "Total Phone Calls", dataSource: "callrail", metric: "totalCalls", format: "number", yearToDate: true },
-    { id: "nfi-18", type: "area-chart", title: "Info Submits (Total)", dataSource: "info-submits", metric: "infoSubmits", format: "number", yearToDate: true },
+    { id: "nfi-13", type: "line-chart", title: "Website Traffic", dataSource: "google-analytics", metric: "sessions", format: "number", yearToDate: true, excludeCurrentMonth: true },
+    { id: "nfi-14", type: "bar-chart", title: "PPC Clicks", dataSource: "google-ads", metric: "clicks", format: "number", yearToDate: true, excludeCurrentMonth: true },
+    { id: "nfi-15", type: "line-chart", title: "PPC Conversions", dataSource: "google-ads", metric: "conversions", format: "number", yearToDate: true, excludeCurrentMonth: true },
+    { id: "nfi-16", type: "line-chart", title: "PPC Cost Per Click", dataSource: "google-ads", metric: "cpc", format: "currency", yearToDate: true, excludeCurrentMonth: true },
+    { id: "nfi-17", type: "area-chart", title: "Total Phone Calls", dataSource: "callrail", metric: "totalCalls", format: "number", yearToDate: true, excludeCurrentMonth: true },
+    { id: "nfi-18", type: "area-chart", title: "Info Submits (Total)", dataSource: "info-submits", metric: "infoSubmits", format: "number", yearToDate: true, excludeCurrentMonth: true },
   ],
   layouts: {
     lg: [
